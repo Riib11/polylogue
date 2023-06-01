@@ -1,0 +1,28 @@
+{
+  "name": "polylogue",
+  "version": "1.0.0",
+  "description": "A framework for abstracting over LLM-powered components.",
+  "main": "index.js",
+  "scripts": {
+    "build": "npx spago build --purs-args \"-g sourcemaps\"",
+    "run": "npx spago run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/riib11/polylogue"
+  },
+  "keywords": [
+    "llm",
+    "ai",
+    "purescript"
+  ],
+  "author": "Henry Blanchette",
+  "license": "ISC",
+  "devDependencies": {
+    "spago": "^0.21.0"
+  },
+  "dependencies": {
+    "fs": "^0.0.1-security",
+    "openai": "^3.2.1"
+  }
+}
