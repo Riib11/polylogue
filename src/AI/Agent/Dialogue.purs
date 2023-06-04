@@ -20,15 +20,15 @@ type Agent errors m = Agent.Agent State errors Query m
 
 type Input = 
   { system :: Maybe String
-  , history :: Array Chat.ChatMessage
+  , history :: Array Chat.Message
   }
 
 type State = 
-  { history :: Array Chat.ChatMessage }
+  { history :: Array Chat.Message }
 
 data Query a
-  = Prompt Chat.ChatMessage (Chat.ChatMessage -> a)
-  | GetHistory (Array Chat.ChatMessage -> a)
+  = Prompt Chat.Message (Chat.Message -> a)
+  | GetHistory (Array Chat.Message -> a)
 derive instance Functor Query
 
 new :: forall errors m. Monad m => Agent errors m -> Input -> Agent.Id State errors Query m
@@ -38,7 +38,7 @@ new agent input = Agent.new agent
       Just str -> [Chat.systemMessage str] <> input.history
   }
 
-define :: forall errors m. Monad m => (NonEmptyArray Chat.ChatMessage -> Agent.M State errors m Chat.ChatMessage) -> Agent errors m
+define :: forall errors m. Monad m => (NonEmptyArray Chat.Message -> Agent.M State errors m Chat.Message) -> Agent errors m
 define genReply = Agent.define case _ of
   Prompt promptMsg k -> do
     history <- gets _.history

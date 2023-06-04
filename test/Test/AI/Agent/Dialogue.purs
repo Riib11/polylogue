@@ -18,7 +18,7 @@ import Text.Pretty (indent)
 
 master :: forall state m. 
   Monad m => MonadEffect m => MonadAff m => 
-  Master.Agent state (chat :: Chat.ChatError) m
+  Master.Agent state (chat :: Chat.Error) m
 master = Master.define \_ -> do
   let state = 
         { history: []

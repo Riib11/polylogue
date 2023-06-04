@@ -98,36 +98,36 @@ instance BoundedEnum Role where
   fromEnum = finiteFromEnum roles
 
 --------------------------------------------------------------------------------
--- ChatMessage-related types
+-- Message-related types
 --------------------------------------------------------------------------------
 
-type ChatRequest
+type Request
   = { model :: Model
-    , messages :: Array ChatMessage
+    , messages :: Array Message
     , temperature :: Temperature }
 
-type ChatMessage
+type Message
   = { role :: Role
     , content :: String }
 
-prettyChatMessage :: forall t84.
+prettyMessage :: forall t84.
   { content :: String
   , role :: Role
   | t84
   }
   -> String
-prettyChatMessage {role: Role role, content} = "[" <> role <> "] " <> content
+prettyMessage {role: Role role, content} = "[" <> role <> "] " <> content
 
-userMessage :: String -> ChatMessage
+userMessage :: String -> Message
 userMessage content = {role: user, content}
 
-assistantMessage :: String -> ChatMessage
+assistantMessage :: String -> Message
 assistantMessage content = {role: assistant, content}
 
-systemMessage :: String -> ChatMessage
+systemMessage :: String -> Message
 systemMessage content = {role: system, content}
 
-type ChatResponse
+type Response
   = { id :: String
     , object :: String
     , created :: Number
@@ -139,7 +139,7 @@ type ChatResponse
     , choices :: Array ChatChoice }
 
 type ChatChoice
-  = { message :: ChatMessage
+  = { message :: Message
     , finish_reason :: String
     , index :: Int }
 
@@ -173,38 +173,36 @@ makeClient Nothing = do
   _makeClient {apiKey, organization}
 makeClient (Just config) = _makeClient config
 
-
-
 --------------------------------------------------------------------------------
--- createChatCompletion
+-- createCompletion
 --------------------------------------------------------------------------------
 
-foreign import _createChatCompletion :: Client -> ChatRequest -> EffectFnAff ChatResponse
+foreign import _createCompletion :: Client -> Request -> EffectFnAff Response
 
-createChatCompletion :: forall m. MonadAff m => Client -> ChatRequest -> m ChatResponse
-createChatCompletion client req = liftAff <<< fromEffectFnAff $
-  _createChatCompletion client req
+createCompletion :: forall m. MonadAff m => Client -> Request -> m Response
+createCompletion client req = liftAff <<< fromEffectFnAff $
+  _createCompletion client req
 
-data ChatError
+data Error
   = EmptyResponseChoices
   | BadFinishReason String
 
-derive instance Generic ChatError _
-instance Show ChatError where show x = genericShow x
+derive instance Generic Error _
+instance Show Error where show x = genericShow x
 
-type ChatConfig = 
+type Config = 
   { chatOptions :: ChatOptions
   , client :: Client }
 
 _chat = Proxy :: Proxy "chat"
 
 chat :: forall m. MonadAff m =>
-  ChatConfig ->
-  Array ChatMessage ->
-  ExceptT ChatError m ChatMessage
+  Config ->
+  Array Message ->
+  ExceptT Error m Message
 chat config msgs = do
   response <- lift $
-    createChatCompletion
+    createCompletion
       config.client
       { model: config.chatOptions.model
       , temperature: config.chatOptions.temperature
