@@ -3,7 +3,7 @@ module AI.Agent.Dialogue where
 import Prelude
 
 import AI.Agent as Agent
-import AI.LLM.Chat as Chat
+import API.Chat.OpenAI as Chat
 import Control.Monad.State (gets, modify, modify_)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)

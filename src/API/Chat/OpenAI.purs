@@ -1,4 +1,4 @@
-module AI.LLM.Chat where
+module API.Chat.OpenAI where
 
 import Prelude
 

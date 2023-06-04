@@ -7,7 +7,7 @@ import AI.Agent.Dialogue as Dialogue
 -- import AI.Agent.Dialogue.Echo as Echo
 import AI.Agent.Dialogue.GPT as GPT
 import AI.Agent.Master as Master
-import AI.LLM.Chat as Chat
+import API.Chat.OpenAI as Chat
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty)
 import Data.Traversable (for_)

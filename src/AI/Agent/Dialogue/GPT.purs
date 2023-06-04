@@ -3,7 +3,7 @@ module AI.Agent.Dialogue.GPT where
 import Prelude
 
 import AI.Agent.Dialogue as Dialogue
-import AI.LLM.Chat as Chat
+import API.Chat.OpenAI as Chat
 import Control.Monad.Except (runExceptT, throwError)
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.Either (Either(..))
