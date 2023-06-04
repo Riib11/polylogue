@@ -7,7 +7,7 @@ export const _makeClient = (config) => () =>
 const DEBUG = true
 
 // makes a chat request
-export const _createChatCompletion = openai => chatCompletionRequest => {
+export const _createCompletion = openai => chatCompletionRequest => {
   return async (onError, onSuccess) => {
     let response = await openai.createChatCompletion(chatCompletionRequest)
     if (response === undefined) onError("chat: response was undefined")

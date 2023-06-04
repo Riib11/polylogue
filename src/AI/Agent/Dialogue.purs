@@ -9,6 +9,8 @@ import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.Maybe (Maybe(..))
+import Prim.Row (class Nub)
+import Record as Record
 import Type.Proxy (Proxy(..))
 
 -- | A dialogue agent is an agent that can have a conversation with a single
@@ -16,29 +18,42 @@ import Type.Proxy (Proxy(..))
 
 _dialogue = Proxy :: Proxy "dialogue"
 
-type Agent errors m = Agent.Agent State errors Query m
+type Agent states errors m = Agent.Agent (States states) errors Query m
+type Id states errors m = Agent.Id (States states) errors Query m
+type M states errors m = Agent.M (States states) errors m
 
-type Input = 
+type Input =
   { system :: Maybe String
   , history :: Array Chat.Message
   }
 
-type State = 
-  { history :: Array Chat.Message }
+type States states =
+  ( history :: Array Chat.Message 
+  | states )
+_history = Proxy :: Proxy "history"
 
 data Query a
   = Prompt Chat.Message (Chat.Message -> a)
   | GetHistory (Array Chat.Message -> a)
 derive instance Functor Query
 
-new :: forall errors m. Monad m => Agent errors m -> Input -> Agent.Id State errors Query m
-new agent input = Agent.new agent
-  { history: case input.system of
-      Nothing -> input.history
-      Just str -> [Chat.systemMessage str] <> input.history
-  }
+new :: forall states errors m. Monad m =>
+  Nub (States states) (States states) =>
+  Agent states errors m ->
+  Input ->
+  Record states ->
+  Id states errors m
+new agent input states = Agent.new agent $
+  Record.disjointUnion
+    { history: case input.system of
+        Nothing -> input.history
+        Just str -> [Chat.systemMessage str] <> input.history
+    }
+    states
 
-define :: forall errors m. Monad m => (NonEmptyArray Chat.Message -> Agent.M State errors m Chat.Message) -> Agent errors m
+define :: forall states errors m. Monad m =>
+  (NonEmptyArray Chat.Message -> M states errors m Chat.Message) ->
+  Agent states errors m
 define genReply = Agent.define case _ of
   Prompt promptMsg k -> do
     history <- gets _.history

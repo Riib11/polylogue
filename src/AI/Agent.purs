@@ -1,92 +1,97 @@
 module AI.Agent 
   ( Agent, M, define
   , Id
-  , new, query, ask, tell )
+  , new, query, ask, tell 
+  , expandErrors, lift )
   where
 
 import Prelude
 
-import Control.Monad.Except (ExceptT)
+import Control.Monad.Except (ExceptT, runExceptT, throwError)
 import Control.Monad.State (StateT, runStateT)
+import Control.Monad.Trans.Class as Trans
+import Data.Either (Either(..))
 import Data.Tuple.Nested ((/\))
 import Data.UUID (UUID)
-import Data.Variant (Variant)
+import Data.Variant (Variant, expand)
+import Prim.Row (class Union)
+import Type.Proxy (Proxy)
 
 -- | An agent definition, `Agent` is parameterized by:
--- |  - `state` - the state of the agent
+-- |  - `states` - the states of the agent
 -- |  - `errors` - the errors that the agent can throw
 -- |  - `query` - the query that the agent can handle
 -- |  - `m` - the monad in which the agent runs
 -- |
 -- | An agent definition is defined by how the agent handles queries. Each
--- | instance of an agent, identified by an `Id`, has its own state and handles
+-- | instance of an agent, identified by an `Id`, has its own states and handles
 -- | queries indepentently of other instances of the same agent.
 newtype
   Agent
-    (state :: Type)
+    (states :: Row Type)
     (errors :: Row Type)
     (query :: Type -> Type)
     (m :: Type -> Type)
   =
-  Agent (forall a. query a -> M state errors m a)
+  Agent (forall a. query a -> M states errors m a)
 
 -- | `M` is an alias for the monad in an `Agent` handles queries.
-type M state errors m = StateT state (ExceptT (Variant errors) m)
+type M states errors m = StateT (Record states) (ExceptT (Variant errors) m)
 
 -- | Makes an agent definition.
-define :: forall state161 errors162 query163 m164. (forall a. query163 a -> StateT state161 (ExceptT (Variant errors162) m164) a) -> Agent state161 errors162 query163 m164
+define :: forall states errors162 query m164. (forall a. query a -> StateT (Record states) (ExceptT (Variant errors162) m164) a) -> Agent states errors162 query m164
 define = Agent
 
 -- | `Id` is the type of agent ids, which matching parameters to the agent it is
 -- | an id for.
 newtype
   Id
-    (state :: Type)
+    (states :: Row Type)
     (errors :: Row Type)
     (query :: Type -> Type) 
     (m :: Type -> Type)
   = 
   Id UUID
 
-derive newtype instance Eq (Id state errors query m)
-derive newtype instance Ord (Id state errors query m)
+derive newtype instance Eq (Id states errors query m)
+derive newtype instance Ord (Id states errors query m)
 
 -- | Makes a new agent instance from an agent definition, and outputs the new
 -- | instances' id.
-new :: forall state errors query m. Agent state errors query m -> state -> Id state errors query m
+new :: forall states errors query m. Agent states errors query m -> Record states -> Id states errors query m
 new = newAgent
 
-foreign import newAgent :: forall state errors query m. 
-  Agent state errors query m ->
-  state ->
-  Id state errors query m
+foreign import newAgent :: forall states errors query m. 
+  Agent states errors query m ->
+  Record states ->
+  Id states errors query m
 
-foreign import getAgent :: forall state errors query m. 
-  Id state errors query m ->
-  Agent state errors query m
+foreign import getAgent :: forall states errors query m. 
+  Id states errors query m ->
+  Agent states errors query m
 
-foreign import getAgentState :: forall state errors query m.
-  Id state errors query m ->
-  state
+foreign import getAgentState :: forall states errors query m.
+  Id states errors query m ->
+  Record states
 
-foreign import setAgentState :: forall state errors query m.
-  Id state errors query m ->
-  state ->
+foreign import setAgentState :: forall states errors query m.
+  Id states errors query m ->
+  Record states ->
   Unit
 
 -- | Sends a query to an agent instance, and yields the result.
-query :: forall state errors query m a. Monad m =>
-  Id state errors query m ->
+query :: forall states errors query m a. Monad m =>
+  Id states errors query m ->
   query a ->
   ExceptT (Variant errors) m a
 query agent_id q = do
-  -- get agent, input, and current state
+  -- get agent, input, and current states
   let Agent handleQuery = getAgent agent_id
-  let state = getAgentState agent_id
+  let states = getAgentState agent_id
   -- run agent query
-  a /\ state' <- flip runStateT state $ handleQuery q
-  -- update state
-  let _ = setAgentState agent_id state'
+  a /\ states' <- flip runStateT states $ handleQuery q
+  -- update states
+  let _ = setAgentState agent_id states'
   pure a
 
 -- | Queries an agent instance with an "ask"-style query, which is a query that
@@ -96,7 +101,7 @@ query agent_id q = do
 -- | 
 -- | getState agent_id = ask agent_id GetState
 -- | ```
-ask :: forall state errors query m a. Monad m => Id state errors query m -> ((a -> a) -> query a) -> ExceptT (Variant errors) m a
+ask :: forall states errors query m a. Monad m => Id states errors query m -> ((a -> a) -> query a) -> ExceptT (Variant errors) m a
 ask agent_id f = query agent_id $ f identity
 
 -- | Queries an agent with a "tell"-style query, which is a query that is
@@ -104,7 +109,24 @@ ask agent_id f = query agent_id $ f identity
 -- | ```purescript
 -- | data Query a = SetState String a
 -- | 
--- | setState agent_id state = tell agent_id $ SetState state
+-- | setState agent_id states = tell agent_id $ SetState states
 -- | ```
-tell :: forall state errors query m a. Monad m => Id state errors query m -> (Unit -> query a) -> ExceptT (Variant errors) m Unit
+tell :: forall states errors query m a. Monad m => Id states errors query m -> (Unit -> query a) -> ExceptT (Variant errors) m Unit
 tell agent_id f = void $ query agent_id (f unit)
+
+-- | Expands the row type of errors that an agent can throw.
+expandErrors :: forall errors0 errors1 errors2 m a.
+  Union errors0 errors1 errors2 =>
+  Monad m =>
+  ExceptT (Variant errors0) m a ->
+  ExceptT (Variant errors2) m a
+expandErrors e = Trans.lift (runExceptT e) >>= case _ of
+  Left err -> throwError (expand err)
+  Right a -> pure a
+
+lift :: forall states errors0 errors1 errors2 m a.
+  Union errors0 errors1 errors2 =>
+  Monad m =>
+  ExceptT (Variant errors0) m a ->
+  StateT (Record states) (ExceptT (Variant errors2) m) a
+lift = Trans.lift <<< expandErrors
