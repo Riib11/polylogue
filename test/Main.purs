@@ -8,11 +8,11 @@ import Data.Variant as V
 import Dotenv as Dotenv
 import Effect (Effect)
 import Effect.Aff (launchAff_)
-import Test.AI.Agent.Dialogue as TestAgentDialogue
+import Test.AI.Agent.Chat as TestAgentChat
 
 main :: Effect Unit
 main = launchAff_ do
   Dotenv.loadFile
-  Master.run TestAgentDialogue.master {} (V.case_
+  Master.run TestAgentChat.master {} (V.case_
     # V.on _chat show)
 
