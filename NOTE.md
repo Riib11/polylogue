@@ -1,4 +1,1 @@
-actually, state should no be nested -- all state is local to each agent. it can
-share any relevant parts of its state with subagents via action queries
-
-probably call them queries actually, since its "action" is what the subagent does, not what you "call" of it
+probabyl should have state transparent rather than primitively mutalble -- theres not really a good reason for that, the user can handle mutability -- this means that hthe user has to provide the state each time they run the agent on a query , and manually update their own use of it -- is this better?
