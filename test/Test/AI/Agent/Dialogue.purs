@@ -8,18 +8,20 @@ import AI.Agent.Dialogue.Echo as Echo
 import AI.Agent.Dialogue.GPT as GPT
 import AI.Agent.Master as Master
 import API.Chat.OpenAI as Chat
+import Control.Monad.Error.Class (class MonadError)
 import Control.Plus (empty)
 import Data.Functor.Variant as FV
 import Data.Traversable (for_)
+import Data.Variant as V
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Class.Console as Console
 import Text.Pretty (indent)
 import Type.Proxy (Proxy(..))
 
-master :: forall m. 
-  Monad m => MonadEffect m => MonadAff m => 
-  Master.Agent () (chat :: Chat.Error) () m
+-- master :: forall m. 
+--   Monad m => MonadEffect m => MonadAff m => MonadError (V.Variant (Dialogue.)) 
+--   Master.Agent () (chat :: Chat.Error) () m
 master = Master.define FV.case_ \_ -> do
   let _states = Proxy :: Proxy ()
 
@@ -27,16 +29,18 @@ master = Master.define FV.case_ \_ -> do
         { history: []
         , system: empty }
 
-  -- echo
-  let 
-    dialogue_id :: GPT.Id () () m
-    dialogue_id = Dialogue.new Echo.define state {}
+  -- -- echo
+  -- let 
+  --   echo_id :: Dialogue.Id () () () _
+  --   echo_id = Dialogue.new Echo.define state {}
 
-  -- -- gpt
-  -- dialogue_id :: GPT.Id () () m <- do
-  --   client <- liftEffect $ Chat.makeClient empty
-  --   let chatOptions = Chat.defaultChatOptions
-  --   pure $ Dialogue.new (GPT.define {client, chatOptions}) state {}
+  -- gpt
+  gpt_id :: GPT.Id () () _ <- do
+    client <- liftEffect $ Chat.makeClient empty
+    let chatOptions = Chat.defaultChatOptions
+    pure $ Dialogue.new (GPT.define {client, chatOptions}) state {}
+
+  let dialogue_id = gpt_id
   
   _ <- Agent.lift $ Agent.ask dialogue_id $ Dialogue.prompt $ Chat.userMessage
     "What's an interesting aspect of programming language theory?"

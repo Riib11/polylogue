@@ -3,8 +3,12 @@ module AI.Agent.Master where
 import Prelude
 
 import AI.Agent as Agent
-import Control.Monad.Except (runExceptT)
+import Control.Monad.Except (ExceptT, runExceptT)
+import Data.Either (Either(..))
 import Data.Functor.Variant as FV
+import Data.Variant as V
+import Effect.Class (class MonadEffect)
+import Effect.Class.Console as Console
 import Type.Proxy (Proxy(..))
 
 _master = Proxy :: Proxy "master"
@@ -26,8 +30,15 @@ define handleQuery main = Agent.define (FV.case_
     pure a)
   )
 
-run :: forall states errors queries m. Monad m => Agent states errors queries m -> Record states -> m Unit
-run master states = do
+run :: forall states errors queries m. 
+  Monad m =>
+  MonadEffect m =>
+  Agent states errors queries (ExceptT (V.Variant errors) m) ->
+  Record states ->
+  (V.Variant errors -> String) ->
+  m Unit
+run master states showError = do
   let master_id = Agent.new master states
-  _ <- runExceptT $ Agent.query master_id $ FV.inj _start (Start unit)
-  pure unit
+  runExceptT (Agent.query master_id (FV.inj _start (Start unit))) >>= case _ of
+    Left err -> Console.log $ "Error in master.run:\n\n" <> showError err
+    Right _ -> pure unit

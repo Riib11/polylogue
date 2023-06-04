@@ -31,6 +31,7 @@ to generate this file without the comments in this block.
   , "partial"
   , "prelude"
   , "record"
+  , "refs"
   , "strings"
   , "transformers"
   , "tuples"
