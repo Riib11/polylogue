@@ -2,10 +2,10 @@ module Test.Main where
 
 import Prelude
 
+import AI.Agent.Master (runMasterAgent)
 import Effect (Effect)
-import Effect.Class.Console (log)
+import Effect.Aff (launchAff_)
+import Test.TestDialogueAgent as TestDialogueAgent
 
 main :: Effect Unit
-main = do
-  log "🍝"
-  log "You should add some tests."
+main = launchAff_ $ runMasterAgent TestDialogueAgent.master

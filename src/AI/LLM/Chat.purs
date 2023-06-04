@@ -1,10 +1,13 @@
 module AI.LLM.Chat where
 
+import Data.Either.Nested
 import Prelude
 
-import Control.Monad.Error.Class (class MonadError, throwError)
-import Control.Monad.Reader (class MonadReader, ask)
+import Control.Monad.Error.Class (throwError)
+import Control.Monad.Except (Except, ExceptT, lift)
+import Control.Monad.Reader (ReaderT, ask)
 import Data.Array as Array
+import Data.Either (Either(..))
 import Data.Enum (class BoundedEnum, class Enum)
 import Data.Finite (finiteBottom, finiteCardinality, finiteFromEnum, finitePred, finiteSucc, finiteToEnum, finiteTop)
 import Data.Generic.Rep (class Generic)
@@ -14,6 +17,7 @@ import Data.Show.Generic (genericShow)
 import Effect (Effect)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Aff.Compat (EffectFnAff, fromEffectFnAff)
+import Type.Proxy (Proxy(..))
 
 --------------------------------------------------------------------------------
 -- Model
@@ -106,6 +110,14 @@ type ChatMessage
   = { role :: Role
     , content :: String }
 
+prettyChatMessage :: forall t84.
+  { content :: String
+  , role :: Role
+  | t84
+  }
+  -> String
+prettyChatMessage {role: Role role, content} = "[" <> role <> "] " <> content
+
 userMessage :: String -> ChatMessage
 userMessage content = {role: user, content}
 
@@ -168,22 +180,22 @@ data ChatError
 derive instance Generic ChatError _
 instance Show ChatError where show x = genericShow x
 
-type ChatContext = 
+type ChatInput = 
   { chatOptions :: ChatOptions
   , client :: Client }
 
-chat :: forall m.
-  MonadAff m =>
-  MonadReader ChatContext m =>
-  MonadError ChatError m =>
-  Array ChatMessage -> m ChatMessage
-chat msgs = do
-  ctx <- ask
-  response <-
+_chat = Proxy :: Proxy "chat"
+
+chat :: forall m. MonadAff m =>
+  ChatInput ->
+  Array ChatMessage ->
+  ExceptT ChatError m ChatMessage
+chat input msgs = do
+  response <- lift $
     createChatCompletion
-      ctx.client
-      { model: ctx.chatOptions.model
-      , temperature: ctx.chatOptions.temperature
+      input.client
+      { model: input.chatOptions.model
+      , temperature: input.chatOptions.temperature
       , messages: msgs }
   case Array.uncons response.choices of
     Nothing -> throwError EmptyResponseChoices

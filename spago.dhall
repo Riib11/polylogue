@@ -18,13 +18,22 @@ to generate this file without the comments in this block.
   , "effect"
   , "either"
   , "enums"
+  , "foldable-traversable"
+  , "functors"
+  , "lists"
   , "maybe"
+  , "node-process"
+  , "node-readline"
+  , "options"
   , "ordered-collections"
   , "partial"
   , "prelude"
+  , "strings"
   , "transformers"
   , "tuples"
   , "unordered-collections"
+  , "uuid"
+  , "variant"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

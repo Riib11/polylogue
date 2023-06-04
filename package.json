@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build": "npx spago build --purs-args \"-g sourcemaps\"",
-    "run": "npx spago run"
+    "run": "npx spago run",
+    "test": "npx spago test"
   },
   "repository": {
     "type": "git",
@@ -23,6 +24,7 @@
   },
   "dependencies": {
     "fs": "^0.0.1-security",
-    "openai": "^3.2.1"
+    "openai": "^3.2.1",
+    "uuid": "^9.0.0"
   }
 }
