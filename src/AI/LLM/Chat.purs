@@ -1,13 +1,12 @@
 module AI.LLM.Chat where
 
-import Data.Either.Nested
 import Prelude
 
+import Control.Assert (assertI)
+import Control.Assert.Assertions (just)
 import Control.Monad.Error.Class (throwError)
-import Control.Monad.Except (Except, ExceptT, lift)
-import Control.Monad.Reader (ReaderT, ask)
+import Control.Monad.Except (ExceptT, lift)
 import Data.Array as Array
-import Data.Either (Either(..))
 import Data.Enum (class BoundedEnum, class Enum)
 import Data.Finite (finiteBottom, finiteCardinality, finiteFromEnum, finitePred, finiteSucc, finiteToEnum, finiteTop)
 import Data.Generic.Rep (class Generic)
@@ -17,6 +16,7 @@ import Data.Show.Generic (genericShow)
 import Effect (Effect)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Aff.Compat (EffectFnAff, fromEffectFnAff)
+import Node.Process as Process
 import Type.Proxy (Proxy(..))
 
 --------------------------------------------------------------------------------
@@ -162,7 +162,18 @@ type ClientConfiguration =
   { organization :: String
   , apiKey :: String }
 
-foreign import makeClient :: ClientConfiguration -> Effect Client
+foreign import _makeClient :: ClientConfiguration -> Effect Client
+
+-- | Make a client instance. If no configuration is provided, then use
+-- | environment-specified values.
+makeClient :: Maybe ClientConfiguration -> Effect Client
+makeClient Nothing = do
+  apiKey <- assertI just <$> Process.lookupEnv "OPENAI_API_KEY"
+  organization <- assertI just <$> Process.lookupEnv "OPENAI_ORGANIZATION_ID"
+  _makeClient {apiKey, organization}
+makeClient (Just config) = _makeClient config
+
+
 
 --------------------------------------------------------------------------------
 -- createChatCompletion
@@ -171,7 +182,8 @@ foreign import makeClient :: ClientConfiguration -> Effect Client
 foreign import _createChatCompletion :: Client -> ChatRequest -> EffectFnAff ChatResponse
 
 createChatCompletion :: forall m. MonadAff m => Client -> ChatRequest -> m ChatResponse
-createChatCompletion client req = liftAff $ fromEffectFnAff (_createChatCompletion client req)
+createChatCompletion client req = liftAff <<< fromEffectFnAff $
+  _createChatCompletion client req
 
 data ChatError
   = EmptyResponseChoices

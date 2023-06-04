@@ -15,6 +15,8 @@ to generate this file without the comments in this block.
   [ "aff"
   , "arrays"
   , "console"
+  , "control"
+  , "dotenv"
   , "effect"
   , "either"
   , "enums"

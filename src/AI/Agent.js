@@ -3,21 +3,21 @@ import { v4 as makeUUID } from 'uuid';
 const agents = new Map()
 const agentStates = new Map()
 
-export const register = agent => input => state => {
+export const newAgent = agent => state => {
   let uuid = makeUUID()
   agents.set(uuid, agent)
   agentStates.set(uuid, state)
   return uuid
 };
 
-export const getAgent = agentId => {
-  return agents.get(agentId)
+export const getAgent = id => {
+  return agents.get(id)
 }
 
-export const getAgentState = agentId => {
-  return agentStates.get(agentId)
+export const getAgentState = id => {
+  return agentStates.get(id)
 }
 
-export const setAgentState = agentId => state => {
-  agentStates.set(agentId, state)
+export const setAgentState = id => state => {
+  agentStates.set(id, state)
 }

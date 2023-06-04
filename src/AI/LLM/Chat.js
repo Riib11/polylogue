@@ -1,7 +1,7 @@
 import { Configuration, OpenAIApi } from "openai";
 
 // make an OpenAIApi instance
-export const makeClient = (config) => () =>
+export const _makeClient = (config) => () =>
   new OpenAIApi(new Configuration(config))
 
 const DEBUG = true

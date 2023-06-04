@@ -1,7 +1,7 @@
 module AI.Agent 
-  ( Agent, makeAgent
-  , AgentId
-  , register, query, ask, tell )
+  ( Agent, M, define
+  , Id
+  , new, query, ask, tell )
   where
 
 import Prelude
@@ -23,45 +23,48 @@ newtype
     (query :: Type -> Type)
     (m :: Type -> Type)
   =
-  Agent (forall a. query a -> AgentM state errors m a)
+  Agent (forall a. query a -> M state errors m a)
 
-type AgentM state errors m = StateT state (ExceptT (Variant errors) m)
+type M state errors m = StateT state (ExceptT (Variant errors) m)
 
-makeAgent = Agent
+-- because`new` is a keyword in Javascript
+define = Agent
 
-runAgent (Agent f) = f
+-- runAgent (Agent f) = f
 
 --
--- registering agents
+-- agent instances
 --
 
 newtype
-  AgentId 
+  Id
     (state :: Type)
     (errors :: Row Type)
     (query :: Type -> Type) 
     (m :: Type -> Type)
   = 
-  AgentId UUID
+  Id UUID
 
-derive newtype instance Eq (AgentId state errors query m)
-derive newtype instance Ord (AgentId state errors query m)
+derive newtype instance Eq (Id state errors query m)
+derive newtype instance Ord (Id state errors query m)
 
-foreign import register :: forall state errors query m. 
+foreign import newAgent :: forall state errors query m. 
   Agent state errors query m ->
-  state -> 
-  AgentId state errors query m
+  state ->
+  Id state errors query m
+
+new = newAgent
 
 foreign import getAgent :: forall state errors query m. 
-  AgentId state errors query m ->
+  Id state errors query m ->
   Agent state errors query m
 
 foreign import getAgentState :: forall state errors query m.
-  AgentId state errors query m ->
+  Id state errors query m ->
   state
 
 foreign import setAgentState :: forall state errors query m.
-  AgentId state errors query m ->
+  Id state errors query m ->
   state ->
   Unit
 
@@ -70,15 +73,15 @@ foreign import setAgentState :: forall state errors query m.
 --
 
 query :: forall state errors query m a. Monad m =>
-  AgentId state errors query m ->
+  Id state errors query m ->
   query a ->
   ExceptT (Variant errors) m a
 query agent_id q = do
   -- get agent, input, and current state
-  let agent = getAgent agent_id
+  let Agent handleQuery = getAgent agent_id
   let state = getAgentState agent_id
   -- run agent query
-  a /\ state' <- flip runStateT state $ runAgent agent q
+  a /\ state' <- flip runStateT state $ handleQuery q
   -- update state
   let _ = setAgentState agent_id state'
   pure a
