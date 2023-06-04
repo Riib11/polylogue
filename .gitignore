@@ -10,5 +10,8 @@ node_modules
 /.purs-repl
 output
 
+# Secrets
+.env
+
 # Build artifacts
 /index.js
