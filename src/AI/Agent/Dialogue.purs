@@ -2,6 +2,7 @@ module AI.Agent.Dialogue where
 
 import Prelude
 
+import Data.Functor.Variant as FV
 import AI.Agent as Agent
 import API.Chat.OpenAI as Chat
 import Control.Monad.State (gets, modify, modify_)
@@ -18,8 +19,8 @@ import Type.Proxy (Proxy(..))
 
 _dialogue = Proxy :: Proxy "dialogue"
 
-type Agent states errors m = Agent.Agent (States states) errors Query m
-type Id states errors m = Agent.Id (States states) errors Query m
+type Agent states errors queries m = Agent.Agent (States states) errors (Queries queries) m
+type Id states errors queries m = Agent.Id (States states) errors (Queries queries) m
 type M states errors m = Agent.M (States states) errors m
 
 type Input =
@@ -32,17 +33,26 @@ type States states =
   | states )
 _history = Proxy :: Proxy "history"
 
-data Query a
-  = Prompt Chat.Message (Chat.Message -> a)
-  | GetHistory (Array Chat.Message -> a)
-derive instance Functor Query
+type Queries queries =
+  ( prompt :: Prompt
+  , getHistory :: GetHistory | queries )
 
-new :: forall states errors m. Monad m =>
+_prompt = Proxy :: Proxy "prompt"
+prompt promptMsg k = FV.inj _prompt $ Prompt promptMsg k
+data Prompt a = Prompt Chat.Message (Chat.Message -> a)
+derive instance Functor Prompt
+
+_getHistory = Proxy :: Proxy "getHistory"
+getHistory k = FV.inj _getHistory $ GetHistory k
+data GetHistory a = GetHistory (Array Chat.Message -> a)
+derive instance Functor GetHistory
+
+new :: forall states errors queries m. Monad m =>
   Nub (States states) (States states) =>
-  Agent states errors m ->
+  Agent states errors queries m ->
   Input ->
   Record states ->
-  Id states errors m
+  Id states errors queries m
 new agent input states = Agent.new agent $
   Record.disjointUnion
     { history: case input.system of
@@ -51,18 +61,20 @@ new agent input states = Agent.new agent $
     }
     states
 
-define :: forall states errors m. Monad m =>
+define :: forall states errors queries m. Monad m =>
+  (forall a. FV.VariantF queries a -> M states errors m a) ->
   (NonEmptyArray Chat.Message -> M states errors m Chat.Message) ->
-  Agent states errors m
-define genReply = Agent.define case _ of
-  Prompt promptMsg k -> do
-    history <- gets _.history
-    -- append prompt message to history
-    st <- modify \st -> st {history = st.history `Array.snoc` promptMsg}
-    -- reply
-    reply <- genReply $ NonEmptyArray.snoc' history promptMsg
-    -- append reply to history
-    modify_ \st' -> st' {history = st.history `Array.snoc` reply}
-    -- yield reply
-    pure $ k reply
-  GetHistory k -> k <$> gets _.history
+  Agent states errors queries m
+define handleQuery genReply = Agent.define (FV.case_
+    # (\_ query -> handleQuery query)
+    # FV.on _prompt (\(Prompt promptMsg k) -> do
+        history <- gets _.history
+        -- append prompt message to history
+        st <- modify \st -> st {history = st.history `Array.snoc` promptMsg}
+        -- reply
+        reply <- genReply $ NonEmptyArray.snoc' history promptMsg
+        -- append reply to history
+        modify_ \st' -> st' {history = st.history `Array.snoc` reply}
+        -- yield reply
+        pure $ k reply)
+    # FV.on _getHistory (\(GetHistory k) -> k <$> gets _.history))
