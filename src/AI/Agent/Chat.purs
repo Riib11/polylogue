@@ -47,20 +47,6 @@ getHistory k = FV.inj _getHistory $ GetHistory k
 data GetHistory a = GetHistory (Array Chat.Message -> a)
 derive instance Functor GetHistory
 
-new :: forall states errors queries m. Monad m =>
-  Nub (States states) (States states) =>
-  Agent states errors queries m ->
-  Config ->
-  Record states ->
-  Id states errors queries m
-new agent input states = Agent.new agent $
-  Record.disjointUnion
-    { history: case input.system of
-        Nothing -> input.history
-        Just str -> [Chat.systemMessage str] <> input.history
-    }
-    states
-
 define :: forall states errors queries m. Monad m =>
   (forall a. FV.VariantF queries a -> M states errors m a) ->
   (NonEmptyArray Chat.Message -> M states errors m Chat.Message) ->
@@ -78,3 +64,17 @@ define handleQuery genReply = Agent.define (FV.case_
         -- yield reply
         pure $ k reply)
     # FV.on _getHistory (\(GetHistory k) -> k <$> gets _.history))
+
+new :: forall states errors queries m. Monad m =>
+  Nub (States states) (States states) =>
+  Agent states errors queries m ->
+  Config ->
+  Record states ->
+  Id states errors queries m
+new agent input states = Agent.new agent $
+  Record.disjointUnion
+    { history: case input.system of
+        Nothing -> input.history
+        Just str -> [Chat.systemMessage str] <> input.history
+    }
+    states

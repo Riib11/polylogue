@@ -22,7 +22,7 @@ import Type.Proxy (Proxy(..))
 -- master :: forall m. 
 --   Monad m => MonadEffect m => MonadAff m => MonadError (V.Variant (Chat.)) 
 --   Master.Agent () (chat :: Chat.Error) () m
-master = Master.define FV.case_ \_ -> do
+master = Master.define \_ -> do
   let _states = Proxy :: Proxy ()
 
   let state = 

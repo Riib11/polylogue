@@ -13,27 +13,25 @@ import Type.Proxy (Proxy(..))
 
 _master = Proxy :: Proxy "master"
 
-type Agent states errors queries m = Agent.Agent states errors (start :: Start | queries) m
+type Agent states errors m = Agent.Agent states errors (start :: Start) m
 
 _start = Proxy :: Proxy "start"
 data Start (a :: Type) = Start a
 derive instance Functor Start
 
-define :: forall states errors queries m. Monad m =>
-  (forall a. FV.VariantF queries a -> Agent.M states errors m a) ->
+define :: forall states errors m. Monad m =>
   (Unit -> Agent.M states errors m Unit) -> 
-  Agent states errors queries m
-define handleQuery main = Agent.define (FV.case_
-  # (\_ query -> handleQuery query)
+  Agent states errors m
+define main = Agent.define (FV.case_
   # FV.on _start (\(Start a) -> do
     void $ main unit
     pure a)
   )
 
-run :: forall states errors queries m. 
+run :: forall states errors m. 
   Monad m =>
   MonadEffect m =>
-  Agent states errors queries (ExceptT (V.Variant errors) m) ->
+  Agent states errors (ExceptT (V.Variant errors) m) ->
   Record states ->
   (V.Variant errors -> String) ->
   m Unit
