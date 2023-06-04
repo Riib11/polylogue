@@ -27,7 +27,6 @@ newtype
 
 type M state errors m = StateT state (ExceptT (Variant errors) m)
 
--- because`new` is a keyword in Javascript
 define = Agent
 
 -- runAgent (Agent f) = f

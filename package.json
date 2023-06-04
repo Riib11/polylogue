@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "npx spago build --purs-args \"-g sourcemaps\"",
+    "docs": "npx spago docs --format markdown --deps-only",
     "run": "npx spago run",
     "test": "npx spago test"
   },
