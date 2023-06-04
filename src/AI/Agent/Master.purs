@@ -2,7 +2,7 @@ module AI.Agent.Master where
 
 import Prelude
 
-import AI.Agent (Agent, AgentId, query, register, runAgent)
+import AI.Agent as Agent
 import Control.Monad.Except (lift, runExceptT)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (runStateT)
@@ -12,9 +12,7 @@ import Type.Proxy (Proxy(..))
 
 _master = Proxy :: Proxy "master"
 
-type MasterAgent m = Agent
-  "master"
-  {}
+type MasterAgent m = Agent.Agent
   {}
   ()
   Start
@@ -26,6 +24,6 @@ derive instance Functor Start
 
 runMasterAgent :: forall m. Monad m => MasterAgent m -> m Unit
 runMasterAgent master = do
-  let master_id = register master {} {}
-  _ <- runExceptT $ query master_id $ Start unit
+  let master_id = Agent.register master {}
+  _ <- runExceptT $ Agent.query master_id $ Start unit
   pure unit

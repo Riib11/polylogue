@@ -180,22 +180,22 @@ data ChatError
 derive instance Generic ChatError _
 instance Show ChatError where show x = genericShow x
 
-type ChatInput = 
+type ChatConfig = 
   { chatOptions :: ChatOptions
   , client :: Client }
 
 _chat = Proxy :: Proxy "chat"
 
 chat :: forall m. MonadAff m =>
-  ChatInput ->
+  ChatConfig ->
   Array ChatMessage ->
   ExceptT ChatError m ChatMessage
-chat input msgs = do
+chat config msgs = do
   response <- lift $
     createChatCompletion
-      input.client
-      { model: input.chatOptions.model
-      , temperature: input.chatOptions.temperature
+      config.client
+      { model: config.chatOptions.model
+      , temperature: config.chatOptions.temperature
       , messages: msgs }
   case Array.uncons response.choices of
     Nothing -> throwError EmptyResponseChoices

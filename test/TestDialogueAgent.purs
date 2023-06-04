@@ -2,7 +2,7 @@ module Test.TestDialogueAgent where
 
 import Prelude
 
-import AI.Agent (Agent(..))
+import AI.Agent
 import AI.Agent as Agent
 import AI.Agent.Dialogue (DialogueQuery(..))
 import AI.Agent.Dialogue.Echo (echo)
@@ -17,11 +17,10 @@ import Effect.Class.Console as Console
 import Text.Pretty (indent)
 
 master :: MasterAgent Aff
-master = Agent case _ of
+master = Agent.makeAgent case _ of
   Start a -> do
     let 
       bong_id = Agent.register echo
-        {systemPrompt: Nothing}
         {history: []}
     
     lift <<< lift $ void $ Agent.ask bong_id $ Prompt $ Chat.userMessage
