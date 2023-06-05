@@ -36,6 +36,7 @@ to generate this file without the comments in this block.
   , "transformers"
   , "tuples"
   , "unordered-collections"
+  , "unsafe-coerce"
   , "uuid"
   , "variant"
   ]
