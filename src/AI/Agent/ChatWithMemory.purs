@@ -2,16 +2,13 @@ module AI.Agent.ChatWithMemory where
 
 import Prelude
 
-import Prelude
 
 import AI.Agent as Agent
 import AI.Agent.Chat as Chat
 import AI.Agent.Chat.Memory as Memory
 import AI.Agent.Manager as Manager
 import AI.AgentInquiry as Agent
-import API.Chat.OpenAI as ChatOpenAI
-import Data.Traversable (for, for_)
-import Hole (hole)
+import Data.Traversable (for_)
 import Prim.Row (class Union)
 import Type.Proxy (Proxy(..))
 

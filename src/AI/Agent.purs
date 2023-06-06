@@ -4,7 +4,8 @@ import Data.Either
 import Data.Tuple.Nested
 import Prelude
 
-import Control.Monad.Error.Class (class MonadThrow, throwError)
+import Control.Monad.Error.Class (class MonadThrow)
+import Control.Monad.Error.Class as Error
 import Control.Monad.Except (class MonadError, class MonadTrans, ExceptT, lift, runExceptT)
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.State (class MonadState, StateT, get, put, runStateT)
@@ -142,7 +143,19 @@ derive newtype instance Monad m => MonadError (V.Variant errors) (AgentM states 
 
 runAgentM states (AgentM m) = flip runStateT states >>> runExceptT $ m
 
-throwExpandedError = throwError <<< V.expand
+throwError :: forall label states error errors' errors m a.
+  IsSymbol label => Cons label error errors' errors =>
+  Monad m =>
+  Proxy label -> error ->
+  AgentM states errors m a
+throwError label = V.inj label >>> Error.throwError
+
+-- throwExpandedError ::
+--   IsSymbol label => Cons label error errors' errors'' => Union 
+--   Monad m =>
+--   Proxy label -> error ->
+--   AgentM states errors m a
+-- throwExpandedError label = V.inj label >>> V.expand >>> Error.throwError
 
 -- !TODO try to avoid using these -- just define stuff with extensible rows
 -- already
@@ -156,7 +169,7 @@ expandAgentM_states :: forall states1 states2 states errors m a.
 expandAgentM_states _ m = AgentM do
   states <- get
   (lift >>> lift $ runAgentM (Coerce.unsafeCoerce states) m) >>= case _ of
-    Left err -> throwError err
+    Left err -> Error.throwError err
     Right (a /\ states') -> do
       -- Leaves `states1` untouched, and overwrites `state2` with the result
       -- state from `m`
@@ -172,7 +185,7 @@ expandAgentM_errors :: forall states errors1 errors2 errors queries m a.
 expandAgentM_errors _ m = AgentM do
   states <- get
   (lift >>> lift $ runAgentM states m) >>= case _ of
-    Left err -> throwError $ V.expand err
+    Left err -> Error.throwError (V.expand err)
     Right (a /\ states') -> do
       put states'
       pure a

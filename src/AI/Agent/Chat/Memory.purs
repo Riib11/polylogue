@@ -16,5 +16,7 @@ type Queries queries =
   | queries )
 
 _get = Proxy :: Proxy "get"
+get = Agent.inquire _get unit
 
 _append = Proxy :: Proxy "append"
+append msg = Agent.inquire _append msg

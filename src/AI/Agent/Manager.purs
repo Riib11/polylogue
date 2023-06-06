@@ -6,11 +6,13 @@ import Prelude
 import AI.Agent as Agent
 import AI.AgentInquiry as Agent
 import Control.Monad.Error.Class (throwError)
+import Control.Monad.Error.Class as Error
 import Control.Monad.State (class MonadTrans, get, gets, lift, modify_)
 import Data.Either (Either(..))
 import Data.Functor.Variant as FV
 import Data.Functor.Variant as VF
 import Data.Symbol (class IsSymbol)
+import Data.Variant as V
 import Hole (hole)
 import Prim.Row (class Cons, class Union)
 import Record as R
@@ -44,7 +46,7 @@ subQuery :: forall
 subQuery subLabel subInput = do
   Agent.Inst subCls subStates <- gets (_.agents >>> R.get subLabel)
   lift (Agent.runAgentM subStates (Agent.query subInput subCls)) >>= case _ of
-    Left err -> Agent.throwExpandedError err
+    Left err -> Error.throwError (V.expand err)
     Right (a /\ subStates') -> do
       modify_ $ R.modify _agents $ R.set subLabel (Agent.Inst subCls subStates')
       pure a
