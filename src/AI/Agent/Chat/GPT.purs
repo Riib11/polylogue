@@ -10,7 +10,6 @@ import API.Chat.OpenAI as ChatOpenAI
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (runExceptT)
 import Data.Array as Array
-import Data.Array.NonEmpty as NonEmptyArray
 import Data.Either (Either(..))
 import Data.Functor.Variant as FV
 import Data.Generic.Rep (class Generic)
@@ -21,6 +20,6 @@ import Type.Proxy (Proxy(..))
 
 define config =
   Agent.addInquiry Chat._chat \history ->
-    runExceptT (ChatOpenAI.chat config (NonEmptyArray.toArray history)) >>= case _ of
+    runExceptT (ChatOpenAI.chat config history) >>= case _ of
       Left chatError -> Agent.throwError Chat._chat chatError
       Right reply -> pure reply

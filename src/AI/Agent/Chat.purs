@@ -10,11 +10,11 @@ import AI.AgentInquiry as Agent
 import API.Chat.OpenAI as ChatOpenAI
 import Type.Proxy (Proxy(..))
 
-type Class states errors queries = Agent.Class states errors (Queries queries)
-type Inst states errors queries = Agent.Inst states errors (Queries queries)
+type Class msg states errors queries = Agent.Class states errors (Queries msg queries)
+type Inst msg states errors queries = Agent.Inst states errors (Queries msg queries)
 
-type Queries queries =
-      ( chat :: Agent.Inquiry (Array ChatOpenAI.Message) ChatOpenAI.Message
+type Queries msg queries =
+      ( chat :: Agent.Inquiry (Array msg) msg
       | queries )
 
 -- Queries

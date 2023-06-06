@@ -8,12 +8,15 @@ import AI.Agent as Agent
 import AI.Agent.Chat as Chat
 import AI.Agent.Chat.Echo as Echo
 import AI.Agent.Chat.GPT as GPT
+import AI.Agent.Chat.Memory as Memory
+import AI.Agent.Chat.Memory.Verbatim as Verbatim
+import AI.Agent.Chat.WithMemory as ChatWithMemory
 import AI.Agent.CommandLine as CommandLine
 import AI.Agent.Manager as Manager
 import AI.AgentInquiry as Agent
 import API.Chat.OpenAI as ChatOpenAI
 import Control.Monad.Except (ExceptT, runExceptT)
-import Control.Monad.State (runStateT)
+import Control.Monad.State (gets, runStateT)
 import Control.Plus (empty)
 import Data.Either (Either(..))
 import Data.Functor.Variant as FV
@@ -32,6 +35,37 @@ import Node.Process as Process
 import Node.ReadLine as ReadLine
 import Partial.Unsafe (unsafePartial)
 import Type.Proxy (Proxy(..))
+
+-- | Example: ChatWithMemory
+_test = Proxy :: Proxy "test"
+
+type Message = String
+
+main :: Effect.Effect Unit
+main = Aff.launchAff_ do
+  let
+
+    cls :: ChatWithMemory.Class Message (history :: _) () () () () () _ _ _ Aff.Aff
+    cls = Agent.define ChatWithMemory.define
+
+    inst = Agent.new cls
+      {agents: 
+        { chat: Agent.new (Agent.define $ Echo.define {default: "error: empty history"}) {}
+        , memory: Memory.new (Agent.define $ Verbatim.define) {} }}
+
+    prog = do
+      response <- cls#Chat.chat ["A"]
+      Console.log response
+      response <- cls#Chat.chat ["B"]
+      Console.log response
+      response <- cls#Chat.chat ["C"]
+      Console.log response
+      history <- cls#ChatWithMemory.getHistory
+      Console.logShow history
+      pure unit
+  
+  void (unsafePartial (Agent.partialRun prog inst))
+  pure unit
 
 {-
 -- Example: command line
