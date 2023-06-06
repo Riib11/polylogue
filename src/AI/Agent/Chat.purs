@@ -18,17 +18,18 @@ _chat = Proxy :: Proxy "chat"
 -- | user. It maintains the history of chat messages.
 
 define config =
-  (Agent.addQuery _prompt \(Prompt promptMsg k) -> do
+  (Agent.addQuery _prompt \(Agent.Inquiry {promptString} k) -> do
+    let prompt = Chat.userMessage promptString
     history <- gets _.history
     -- append prompt message to history
-    st <- modify \st -> st {history = st.history `Array.snoc` promptMsg}
+    st <- modify \st -> st {history = st.history `Array.snoc` prompt}
     -- reply
-    reply <- config.reply $ NonEmptyArray.snoc' history promptMsg
+    reply <- config.reply $ NonEmptyArray.snoc' history prompt
     -- append reply to history
     modify_ \st' -> st' {history = st.history `Array.snoc` reply}
     -- yield reply
     pure $ k reply) >>>
-  (Agent.addQuery _getHistory \(GetHistory k) -> 
+  (Agent.addQuery _getHistory \(Agent.Inquiry _ k) -> 
     k <$> gets _.history)
 
 new cls input states = Agent.new cls $ 
@@ -39,11 +40,7 @@ new cls input states = Agent.new cls $
     states
 
 _prompt = Proxy :: Proxy "prompt"
-prompt promptMsg = FV.inj _prompt <<< Prompt promptMsg
-data Prompt a = Prompt Chat.Message (Chat.Message -> a)
-derive instance Functor Prompt
+prompt promptString = Agent.ask $ Agent.makeAsk _prompt {promptString}
 
 _getHistory = Proxy :: Proxy "getHistory"
-getHistory = FV.inj _getHistory <<< GetHistory
-data GetHistory a = GetHistory (Array Chat.Message -> a)
-derive instance Functor GetHistory
+getHistory = Agent.ask $ Agent.makeAsk _getHistory unit

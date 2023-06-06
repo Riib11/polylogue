@@ -62,7 +62,7 @@ data
     (Class states errors queries m)
     (Record states)
 
-new = Inst
+new cls states1 states2 = Inst cls $ R.union states1 states2
 
 query :: forall states errors queries m a. 
   Monad m => MonadError (V.Variant errors) m =>
@@ -75,18 +75,18 @@ query q (Inst cls states) =
     Right (a /\ states') -> do
       pure $ Inst cls states' /\ a
 
--- queryEnv :: forall env states errors queries m a.
---   MonadState env m =>
---   MonadError (V.Variant errors) m =>
---   { get :: env -> Inst states errors queries m 
---   , put :: Inst states errors queries m -> env -> env } ->
---   FV.VariantF queries a ->
---   m a
--- queryEnv env q = do
---   inst <- gets env.get
---   (inst' /\ a) <- query q inst
---   modify_ $ env.put inst'
---   pure $ a
+-- | Inquiry
+
+data Inquiry input output a = Inquiry input (output -> a)
+derive instance Functor (Inquiry input output)
+
+makeInquiry label input output = FV.inj label $ Inquiry input output
+
+inquiry label i = query <<< FV.inj label <<< Inquiry i
+
+-- | Ask
+
+makeAsk label input = FV.inj label <<< Inquiry input
 
 ask :: forall states errors queries m a. 
   Monad m => MonadError (V.Variant errors) m =>
@@ -95,12 +95,17 @@ ask :: forall states errors queries m a.
   m (Inst states errors queries m /\ a)
 ask f = query (f identity)
 
-tell :: forall states errors queries m. 
+-- | Tell
+
+makeTell label input = FV.inj label $ Inquiry input (const unit)
+
+tell :: forall states errors queries m a.
   Monad m => MonadError (V.Variant errors) m =>
-  (forall a. a -> FV.VariantF queries a) ->
+  (a -> FV.VariantF queries Unit) ->
+  a ->
   Inst states errors queries m ->
   m (Inst states errors queries m /\ Unit)
-tell f = query (f unit)
+tell f a = query (f a)
 
 -- | AgentM
 
@@ -137,25 +142,41 @@ runAgentM states (AgentM m) = flip runStateT states >>> runExceptT $ m
 -- !TODO try to avoid using these -- just define stuff with extensible rows
 -- already
 
--- expandM_states :: forall states1 states2 states errors queries m a. 
---   Monad m =>
---   Union states1 states2 states =>
---   AgentM states1 errors queries m a -> 
---   AgentM states errors queries m a
--- expandM_states m = AgentM do
---   states <- get
---   (lift >>> lift $ runAgentM (Coerce.unsafeCoerce states) m) >>= case _ of
---     Left err -> throwError err
---     Right (a /\ states') -> do
---       put $ UnsafeUnion.unsafeUnion states' states
---       pure a
+expandAgentM_states' :: forall states1 states2 states errors m a. 
+  Monad m =>
+  Union states1 states2 states =>
+  AgentM states1 errors m a ->
+  AgentM states errors m a
+expandAgentM_states' m = AgentM do
+  states <- get
+  (lift >>> lift $ runAgentM (Coerce.unsafeCoerce states) m) >>= case _ of
+    Left err -> throwError err
+    Right (a /\ states') -> do
+      put $ UnsafeUnion.unsafeUnion states' states
+      pure a
 
--- expandM_errors :: forall states errors1 errors2 errors queries m a.
+expandAgentM_states :: forall states1 states2 states errors m a. 
+  Monad m =>
+  Union states1 states2 states =>
+  Proxy states1 ->
+  AgentM states2 errors m a ->
+  AgentM states errors m a
+expandAgentM_states _ m = AgentM do
+  states <- get
+  (lift >>> lift $ runAgentM (Coerce.unsafeCoerce states) m) >>= case _ of
+    Left err -> throwError err
+    Right (a /\ states') -> do
+      -- Leaves `states1` untouched, and overwrites `state2` with the result
+      -- state from `m`
+      put $ UnsafeUnion.unsafeUnion states' states
+      pure a
+
+-- expandAgentM_errors :: forall states errors1 errors2 errors queries m a.
 --   Monad m =>
 --   Union errors1 errors2 errors =>
 --   AgentM states errors1 queries m a ->
 --   AgentM states errors queries m a
--- expandM_errors m = AgentM do
+-- expandAgentM_errors m = AgentM do
 --   states <- get
 --   (lift >>> lift $ runAgentM states m) >>= case _ of
 --     Left err -> throwError $ V.expand err
@@ -169,4 +190,4 @@ runAgentM states (AgentM m) = flip runStateT states >>> runExceptT $ m
 --   Union errors1 errors2 errors =>
 --   AgentM states1 errors1 queries m a ->
 --   AgentM states errors queries m a
--- expandAgentM m = expandM_states >>> expandM_errors $ m
+-- expandAgentM m = expandAgentM_states' >>> expandAgentM_errors $ m

@@ -4,7 +4,7 @@ import { Configuration, OpenAIApi } from "openai";
 export const _makeClient = (config) => () =>
   new OpenAIApi(new Configuration(config))
 
-const DEBUG = true
+const DEBUG = false
 
 // makes a chat request
 export const _createCompletion = openai => chatCompletionRequest => {
