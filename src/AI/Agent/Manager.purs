@@ -1,41 +1,54 @@
 module AI.Agent.Manager where
 
+import Data.Tuple.Nested
 import Prelude
 
 import AI.Agent as Agent
+import AI.AgentInquiry as Agent
 import Control.Monad.Error.Class (throwError)
-import Control.Monad.State (get, gets, lift, modify_)
+import Control.Monad.State (class MonadTrans, get, gets, lift, modify_)
 import Data.Either (Either(..))
+import Data.Functor.Variant as FV
+import Data.Functor.Variant as VF
 import Data.Symbol (class IsSymbol)
-import Data.Tuple.Nested
 import Hole (hole)
-import Prim.Row (class Cons)
+import Prim.Row (class Cons, class Union)
 import Record as R
 import Type.Proxy (Proxy(..))
 
 -- | A manager agent maintains a state with labeled agent instances.
 
-new :: forall (agents :: Row Type) states errors queries m.
-  { agents :: Record agents } ->
-  Agent.Class (agents :: Record agents | states) errors queries m ->
-  Record states -> 
-  Agent.Inst (agents :: Record agents | states) errors queries m
-new config cls = Agent.new cls
-  { agents: config.agents
-  }
+type States (agents :: Row Type) states = (agents :: Record agents | states)
+
+type Class agents states errors queries m = Agent.Class (States agents states) errors queries m
+type Inst agents states errors queries m = Agent.Inst (States agents states) errors queries m
+type AgentM agents states errors m a = Agent.AgentM (States agents states) errors m a
 
 _agents = Proxy :: Proxy "agents"
 
-sub :: forall label agents agents' states errors queries m a.
-  IsSymbol label =>
+subQuery :: forall 
+  subLabel subStates subErrors subQueries
+  agents_ states_ errors_ 
+  agents states errors
+  m a.
+  -- subagent is among manager's agents
+  IsSymbol subLabel =>
+  Union subStates states_ states =>
+  Union subErrors errors_ errors =>
+  Cons subLabel (Agent.Inst subStates subErrors subQueries m) agents_ agents =>
   Monad m =>
-  Cons label (Agent.Inst states errors queries m) agents' agents =>
-  Proxy label ->
-  ( Agent.Inst states errors queries m -> 
-    m (Agent.Inst states errors queries m /\ a) ) ->
-  Agent.AgentM (agents :: Record agents | states) errors m a
-sub label f = do
-  subInst <- gets (_.agents >>> R.get label)
-  subInst' /\ a <- lift $ f subInst
-  modify_ $ R.modify _agents $ R.set label subInst'
-  pure a
+  -- subAgent's label
+  Proxy subLabel ->
+  -- subAgent's query input
+  Agent.QueryInput subQueries a ->
+  AgentM agents states errors m a
+subQuery subLabel subInput = do
+  Agent.Inst subCls subStates <- gets (_.agents >>> R.get subLabel)
+  lift (Agent.runAgentM subStates (Agent.query subInput subCls)) >>= case _ of
+    Left err -> Agent.throwExpandedError err
+    Right (a /\ subStates') -> do
+      modify_ $ R.modify _agents $ R.set subLabel (Agent.Inst subCls subStates')
+      pure a
+
+subInquire subLabel label input = 
+  subQuery subLabel (FV.inj label (Agent.Inquiry input identity))
