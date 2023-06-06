@@ -30,8 +30,35 @@ import Effect.Unsafe (unsafePerformEffect)
 import Hole (hole)
 import Node.Process as Process
 import Node.ReadLine as ReadLine
+import Partial.Unsafe (unsafePartial)
 import Type.Proxy (Proxy(..))
 
+{-
+-- Example: command line
+main :: Effect.Effect Unit
+main = Aff.launchAff_ do
+  let
+    cls = 
+      Agent.define $ 
+        CommandLine.define
+          {interfaceOptions: 
+            ReadLine.output := Process.stdout <>
+            ReadLine.terminal := true }
+    inst =
+      CommandLine.new cls {}
+    prog = do
+      CommandLine.open cls
+      void $ cls#CommandLine.question "name: "
+      void $ cls#CommandLine.question "age: "
+      void $ cls#CommandLine.question "occupation: "
+      CommandLine.close cls
+      pure unit
+  void (unsafePartial (Agent.partialRun prog inst))
+  pure unit
+-}
+
+{-
+-- Example: manager
 main :: Effect.Effect Unit
 main = do
   let cls = exampleManagerClass
@@ -53,8 +80,8 @@ exampleManagerClass :: forall m. Monad m =>
     () 
     (abc :: Agent.Inquiry Unit String)
     m
-exampleManagerClass = Agent.empty
-  # Agent.addQuery _abc \(Agent.Inquiry _ output) -> do
+exampleManagerClass = Agent.define $
+  Agent.addQuery _abc \(Agent.Inquiry _ output) -> do
     aStr <- Manager.subInquire _sub1 _test "a"
     bStr <- Manager.subInquire _sub2 _test "b"
     cStr <- Manager.subInquire _sub3 _test "c"
@@ -81,68 +108,5 @@ exampleManagerInst = Agent.new exampleManagerClass
         # Agent.addQuery _test 
           \(Agent.Inquiry input output) -> pure (output ("I am subagent " <> show name <> " and I was given input " <> show input)))
       {}
-
-{-
-_start = Proxy :: Proxy "start"
-_cl = Proxy :: Proxy "cl"
-_chat = Proxy :: Proxy "chat"
-
-manager client =
-  
-  Manager.new {agents: {cl, chat}} 
-    (Agent.empty 
-      # Agent.addQuery _start (\(Agent.Inquiry a k) -> do
-        Console.log "[open]"
-        Agent.expandAgentM_states' $ Manager.sub _cl $ CommandLine.open unit
-        
-        question <- Agent.expandAgentM_states' $ Manager.sub _cl $ CommandLine.question "Q: "
-        answer <- Agent.expandAgentM_states' $ Manager.sub _chat $ Chat.prompt question
-        Console.log $ "A: " <> answer.content
-
-        question <- Agent.expandAgentM_states' $ Manager.sub _cl $ CommandLine.question "Q: "
-        answer <- Agent.expandAgentM_states' $ Manager.sub _chat $ Chat.prompt question
-        Console.log $ "A: " <> answer.content
-
-        question <- Agent.expandAgentM_states' $ Manager.sub _cl $ CommandLine.question "Q: "
-        answer <- Agent.expandAgentM_states' $ Manager.sub _chat $ Chat.prompt question
-        Console.log $ "A: " <> answer.content
-
-        Console.log "[close]"
-        Agent.expandAgentM_states' $ Manager.sub _cl $ CommandLine.close unit
-        pure (k a)))
-    { interface: Nothing
-    , history: [] }
-  
-  where
-  
-  cl =
-    CommandLine.new
-      (Agent.empty
-        # CommandLine.define 
-          { interfaceOptions:
-            ReadLine.output := Process.stdout <>
-            ReadLine.terminal := true })
-      { history: [] }
-  
-  chat =
-    Chat.new
-      -- (Agent.empty 
-      --   # Echo.define)
-      (Agent.empty
-        # GPT.define
-          { chatOptions: ChatOpenAI.defaultChatOptions
-          , client })
-      { system: Nothing
-      , history: [] }
-      {}
-      { interface: Nothing }
-
-main :: Effect.Effect Unit
-main = Aff.launchAff_ do
-  Dotenv.loadFile
-  -- Console.logShow =<< liftEffect Process.getEnv
-  client <- liftEffect $ ChatOpenAI.makeClient Nothing
-  void $ runExceptT $ Agent.query (FV.inj _start (Agent.Inquiry unit identity)) (manager client)
-
--- What's an innovative new discovery in programming languages theory?
 -}
+

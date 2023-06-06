@@ -18,11 +18,11 @@ import Type.Proxy (Proxy(..))
 
 -- | A manager agent maintains a state with labeled agent instances.
 
-type States (agents :: Row Type) states = (agents :: Record agents | states)
-
-type Class agents states errors queries m = Agent.Class (States agents states) errors queries m
-type Inst agents states errors queries m = Agent.Inst (States agents states) errors queries m
+type Class agents states errors m a = Agent.Class (States agents states) errors m a
+type Inst agents states errors m a = Agent.Inst (States agents states) errors m a
 type AgentM agents states errors m a = Agent.AgentM (States agents states) errors m a
+
+type States (agents :: Row Type) states = (agents :: Record agents | states)
 
 _agents = Proxy :: Proxy "agents"
 
@@ -33,7 +33,6 @@ subQuery :: forall
   m a.
   -- subagent is among manager's agents
   IsSymbol subLabel =>
-  Union subStates states_ states =>
   Union subErrors errors_ errors =>
   Cons subLabel (Agent.Inst subStates subErrors subQueries m) agents_ agents =>
   Monad m =>
