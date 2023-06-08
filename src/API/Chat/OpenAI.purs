@@ -168,8 +168,8 @@ foreign import _makeClient :: ClientConfiguration -> Effect Client
 -- | environment-specified values.
 makeClient :: Maybe ClientConfiguration -> Effect Client
 makeClient Nothing = do
-  apiKey <- assertI just <$> Process.lookupEnv "OPENAI_API_KEY"
-  organization <- assertI just <$> Process.lookupEnv "OPENAI_ORGANIZATION_ID"
+  apiKey <- assertI (just "apiKey") <$> Process.lookupEnv "OPENAI_API_KEY"
+  organization <- assertI (just "organization") <$> Process.lookupEnv "OPENAI_ORGANIZATION_ID"
   _makeClient {apiKey, organization}
 makeClient (Just config) = _makeClient config
 

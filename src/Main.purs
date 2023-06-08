@@ -38,6 +38,79 @@ import Partial.Unsafe (unsafePartial)
 import Text.Pretty (bullets)
 import Type.Proxy (Proxy(..))
 
+-- | Example: Manager, ChatWithMemory, CommandLine
+
+_main = Proxy :: Proxy "main"
+_start = Proxy :: Proxy "start"
+_chat = Proxy :: Proxy "chat"
+_user = Proxy :: Proxy "user"
+_assistant = Proxy :: Proxy "assistant"
+
+type Message = ChatOpenAI.Message
+type Errors = CommandLine.Errors (GPT.Errors ())
+
+type User = Agent.Agent (CommandLine.States ()) Errors (CommandLine.Queries ()) Aff.Aff
+type UserStates = CommandLine.States ()
+
+type Assistant = Agent.Agent AssistantStates Errors (ChatWithMemory.Queries Message ()) Aff.Aff
+type AssistantStates = ChatWithMemory.States Message () () () () Errors () Aff.Aff
+
+type Master = Agent.Agent MasterStates Errors (Manager.Queries (main :: Agent.Inquiry Unit Unit)) Aff.Aff
+type MasterStates = Manager.States (user :: User, assistant :: Assistant) (user :: Record UserStates, assistant :: Record AssistantStates) ()
+
+type MasterAllSubAgents = (user :: User, assistant :: Assistant)
+
+main :: Effect.Effect Unit
+main = Aff.launchAff_ do
+  Dotenv.loadFile
+  client <- liftEffect $ ChatOpenAI.makeClient Nothing
+
+  let
+    user :: User
+    user = Agent.empty 
+      # CommandLine.extend 
+          { interfaceOptions: 
+              ReadLine.output := Process.stdout <>
+              ReadLine.terminal := true }
+
+  let 
+    assistant :: Assistant
+    assistant = Agent.empty # ChatWithMemory.extend
+
+  let
+    master :: Master
+    master = Agent.empty #
+      Agent.defineInquiry _main \_ -> do
+        Manager.subDo _user $ CommandLine.open
+        
+        prompt <- Manager.subDo _user $ Chat.chat ["Q: "]
+        logResponse $ Manager.subDo _assistant $ Chat.chat [ChatOpenAI.userMessage prompt]
+        logResponse $ Manager.subDo _assistant $ Chat.chat [ChatOpenAI.userMessage "Explain that in more detail."]
+
+        history <- Manager.subDo _assistant $ ChatWithMemory.getHistory
+        Console.log $ "history:" <> (bullets (history <#> _.content))
+
+        Manager.subDo _user $ CommandLine.close
+      where
+      logResponse = (_ >>= \response -> Console.log $ "A: " <> response.content)
+
+  Agent.catchingRun (\(err /\ _states) -> Console.log $ "error: " <> show err)
+    { allSubAgents: {assistant, user}
+    , allSubStates:
+        { user: {interface: Nothing} 
+        , assistant:
+            { allSubAgents:
+                { chat: Agent.empty # GPT.extend {client, chatOptions: ChatOpenAI.defaultChatOptions}
+                  -- Agent.empty # Echo.extend {default: "echo error: empty history"}
+                , memory: Agent.empty # Verbatim.extend }
+            , allSubStates:
+                { chat: {}
+                , memory: Memory.extendInit {} {} }} }
+    }
+    (runReaderT (Agent.inquire _main unit) master)
+
+  pure unit
+
 {-
 -- | Example: Manager, ChatWithMemory, CommandLine
 

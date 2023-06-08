@@ -9,11 +9,11 @@ import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested (type (/\), (/\))
 
-just :: forall a. Assertion (Maybe a) a
-just = 
+just :: forall a. String -> Assertion (Maybe a) a
+just sym = 
   { label: "just"
   , check: case _ of
-      Nothing -> throwError "Expected `Just _`, got `Nothing`"
+      Nothing -> throwError $ "Expected `Just " <> sym <> " `, got `Nothing`"
       Just a -> pure a
   }
 
