@@ -6,12 +6,12 @@ import Prelude
 
 import AI.Agent as Agent
 import AI.Agent.Chat as Chat
+import AI.Agent.Chat.CommandLine as CommandLine
 import AI.Agent.Chat.Echo as Echo
 import AI.Agent.Chat.GPT as GPT
 import AI.Agent.Chat.Memory as Memory
 import AI.Agent.Chat.Memory.Verbatim as Verbatim
 import AI.Agent.Chat.WithMemory as ChatWithMemory
-import AI.Agent.CommandLine as CommandLine
 import AI.Agent.Manager as Manager
 import AI.AgentInquiry as Agent
 import API.Chat.OpenAI as ChatOpenAI
@@ -36,6 +36,69 @@ import Node.ReadLine as ReadLine
 import Partial.Unsafe (unsafePartial)
 import Type.Proxy (Proxy(..))
 
+
+-- | Example: Manager, ChatWithMemory, CommandLine
+
+_test = Proxy :: Proxy "test"
+_start = Proxy :: Proxy "start"
+_chat = Proxy :: Proxy "chat"
+_user = Proxy :: Proxy "user"
+_assistant = Proxy :: Proxy "assistant"
+
+type Message = String
+
+type Errors = CommandLine.Errors ()
+
+main :: Effect.Effect Unit
+main = Aff.launchAff_ do
+  let
+    user = CommandLine.new cli {}
+      where
+      cli :: CommandLine.Class () () () Aff.Aff
+      cli = Agent.define 
+        (CommandLine.define
+          { interfaceOptions: 
+              ReadLine.output := Process.stdout <>
+              ReadLine.terminal := true })
+
+    assistant = Agent.new chat
+      {agents: 
+        { chat: Agent.new (Agent.define $ Echo.define {default: "error: empty history"}) {}
+        , memory: Memory.new (Agent.define $ Verbatim.define) {} }}
+      where
+      chat :: ChatWithMemory.Class Message (history :: _) Errors () () () () _ _ _ Aff.Aff
+      chat = Agent.define ChatWithMemory.define
+
+    manager :: Manager.Class (user :: _, assistant :: _) () Errors (start :: _) Aff.Aff
+    manager = Agent.define (Agent.addInquiry _start \_ -> do
+      Manager.subInquire _user CommandLine._open unit
+      prompt <- Manager.subInquire _user Chat._chat ["Q: "]
+      response <- Manager.subInquire _
+
+
+      
+      -- response <- chat#Chat.chat ["A"]
+      -- Console.log response
+      -- response <- chat#Chat.chat ["B"]
+      -- Console.log response
+      -- response <- chat#Chat.chat ["C"]
+      -- Console.log response
+      
+      -- history <- chat#ChatWithMemory.getHistory
+      -- Console.logShow history
+      
+      Manager.subInquire _user CommandLine._close unit
+      pure unit)
+
+    master = Agent.new manager {agents: {user: user, assistant}}
+  
+  void do
+    master#Agent.unsafeRun do
+      manager#Agent.inquire _start unit
+      pure unit
+
+
+{-
 -- | Example: ChatWithMemory
 _test = Proxy :: Proxy "test"
 
@@ -66,6 +129,7 @@ main = Aff.launchAff_ do
   
   void (unsafePartial (Agent.partialRun prog inst))
   pure unit
+-}
 
 {-
 -- Example: command line
