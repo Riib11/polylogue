@@ -38,6 +38,7 @@ import Partial.Unsafe (unsafePartial)
 import Text.Pretty (bullets)
 import Type.Proxy (Proxy(..))
 
+{-
 -- | Example: Manager, ChatWithMemory, CommandLine
 
 _main = Proxy :: Proxy "main"
@@ -49,13 +50,21 @@ _assistant = Proxy :: Proxy "assistant"
 type Message = String
 type Errors = CommandLine.Errors ()
 
--- type MasterAllSubAgents = (user :: _, assistant :: _)
--- type MasterAllSubStates = (user :: _, assistant :: _)
+type User = Agent.Agent (CommandLine.States ()) (CommandLine.Errors ()) (CommandLine.Queries ()) Aff.Aff
+type UserStates = CommandLine.States ()
+
+type Assistant = Agent.Agent AssistantStates (ChatWithMemory.Errors Errors) (ChatWithMemory.Queries Message ()) Aff.Aff
+type AssistantStates = ChatWithMemory.States Message () () () () (commandLine :: CommandLine.Error) () Aff.Aff
+
+type Master = Agent.Agent MasterStates (Manager.Errors Errors) (Manager.Queries (main :: Agent.Inquiry Unit Unit)) Aff.Aff
+type MasterStates = Manager.States (user :: User, assistant :: Assistant) (user :: Record UserStates, assistant :: Record AssistantStates) ()
+
+type MasterAllSubAgents = (user :: User, assistant :: Assistant)
 
 main :: Effect.Effect Unit
 main = Aff.launchAff_ do
   let
-    user :: Agent.Agent (CommandLine.States ()) (CommandLine.Errors ()) (CommandLine.Queries ()) Aff.Aff
+    user :: User
     user = Agent.empty 
       # CommandLine.extend 
           { interfaceOptions: 
@@ -63,11 +72,11 @@ main = Aff.launchAff_ do
               ReadLine.terminal := true }
 
   let 
-    assistant :: Agent.Agent (ChatWithMemory.States Message _ _ _ _ _ _ Aff.Aff) (ChatWithMemory.Errors Errors) (ChatWithMemory.Queries Message ()) Aff.Aff
+    assistant :: Assistant
     assistant = Agent.empty # ChatWithMemory.extend
 
   let
-    master :: Agent.Agent (Manager.States (user :: _, assistant :: _) (user :: _, assistant :: _) ()) (Manager.Errors Errors) (Manager.Queries (main :: Agent.Inquiry Unit Unit)) Aff.Aff
+    master :: Master
     master = Agent.empty #
       Agent.defineInquiry _main \_ -> do
         Manager.subDo _user $ CommandLine.open
@@ -108,6 +117,7 @@ main = Aff.launchAff_ do
     (runReaderT (Agent.inquire _main unit) master)
 
   pure unit
+-}
 
 {-
 -- | Example: Manager, ChatWithMemory, CommandLine
