@@ -2,28 +2,15 @@ module AI.Agent.Chat.Memory.Verbatim where
 
 import Prelude
 
-import AI.Agent as Agent
 import AI.Agent.Chat.Memory as Memory
-import AI.AgentInquiry as Agent
-import API.Chat.OpenAI as ChatOpenAI
-import Control.Monad.State (gets, modify_)
+import Control.Monad.State (modify_)
 import Data.Array as Array
 import Record as R
-import Type.Proxy (Proxy(..))
 
 -- | A Memory agent that maintains the entire chat history.
 
 extend :: forall msg states errors queries m.
   Monad m =>
-  Agent.ExtensibleAgent states errors queries (Memory.Queries msg queries) m
-extend =
-  (Agent.defineInquiry Memory._get \_ -> ) >>>
-  (Agent.defineInquiry Memory._append ?a)
-
--- define :: forall msg states errors queries m. Monad m => 
---   Agent.ExtensibleClass (history :: Array msg | states) errors queries (Memory.Queries msg queries) m
--- define =
---   (Agent.addInquiry Memory._get \_ -> gets _.history) >>>
---   (Agent.addInquiry Memory._append \msg -> modify_ (R.modify _history (_ `Array.snoc` msg)))
-
-_history = Proxy :: Proxy "history"
+  Memory.ExtensibleAgent msg states errors queries m
+extend = Memory.extend
+  { append: \msg -> modify_ (R.modify Memory._history (_ `Array.snoc` msg)) }

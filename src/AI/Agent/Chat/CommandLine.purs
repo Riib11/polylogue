@@ -2,9 +2,9 @@ module AI.Agent.Chat.CommandLine where
 
 import Prelude
 
-import AI.Agent as Agent
+import AI.Agent (ExtensibleAgent, QueryF) as Agent
 import AI.Agent.Chat as Chat
-import AI.AgentInquiry as Agent
+import AI.AgentInquiry (Inquiry, defineInquiry, inquire) as Agent
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (gets, modify_)
 import Data.Array as Array
@@ -21,9 +21,13 @@ import Node.ReadLine as ReadLine
 import Node.ReadLine.Aff as ReadLineAff
 import Type.Proxy (Proxy(..))
 
-type Class states errors queries = Agent.Class (States states) (Errors errors) (Queries queries)
-type Inst states errors queries = Agent.Inst (States states) (Errors errors) (Queries queries)
-type ExtensibleClass states errors queries m = Agent.ExtensibleClass (States states) (Errors errors) queries (Queries queries) m
+_interface = Proxy :: Proxy "interface"
+_commandLine = Proxy :: Proxy "commandLine"
+_open = Proxy :: Proxy "open"
+_close = Proxy :: Proxy "close"
+
+type ExtensibleAgent states errors queries m =
+  Agent.ExtensibleAgent (States states) (Errors errors) queries (Queries queries) m
 
 type States states =
   ( interface :: Maybe ReadLine.Interface 
@@ -38,36 +42,30 @@ type Queries queries = Chat.Queries String
   , close :: Agent.Inquiry Unit Unit
   | queries )
 
-_commandLine = Proxy :: Proxy "commandLine"
-
-define :: forall states errors queries m.
+extend :: forall states errors queries m.
   MonadEffect m => MonadAff m =>
   { interfaceOptions :: Options CommandLine.InterfaceOptions } ->
-  ExtensibleClass states errors queries m
-define params =
-  (Agent.addInquiry _open \_ -> do
+  ExtensibleAgent states errors queries m
+extend params =
+  (Agent.defineInquiry _open \_ -> do
     gets _.interface >>= case _ of
       Just _ -> throwError $ V.inj _commandLine OpenWhenOpened
       Nothing -> do
         interface <- liftEffect $ ReadLine.createInterface Process.stdin params.interfaceOptions
         modify_ _{interface = Just interface}) >>>
-  (Agent.addInquiry Chat._chat \prompts -> do
+  (Agent.defineInquiry Chat._chat \prompts -> do
     ReadLineAff.question (Array.intercalate "\n\n" prompts) =<< getInterface QuestionWhenClosed) >>>
-  (Agent.addInquiry _close \_ -> do
+  (Agent.defineInquiry _close \_ -> do
     ReadLineAff.close =<< getInterface CloseWhenClosed)
   where
   getInterface err = gets _.interface >>= case _ of
     Nothing -> throwError $ V.inj _commandLine err
     Just interface -> pure interface
 
-new cls = Agent.extensibleNew cls {interface: Nothing}
-
--- Queries
-
-_open = Proxy :: Proxy "open"
+open :: forall states errors queries m. Agent.QueryF (States states) (Errors errors) (Queries queries) m Unit
 open = Agent.inquire _open unit
 
-_close = Proxy :: Proxy "close"
+close :: forall states errors queries m. Agent.QueryF (States states) (Errors errors) (Queries queries) m Unit
 close = Agent.inquire _close unit
 
 data Error

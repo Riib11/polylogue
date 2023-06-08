@@ -3,21 +3,24 @@
 -- with incrementally summarized history, etc. like langhchain stuff
 module AI.Agent.Chat where
 
+
 import Prelude
 
 import AI.Agent as Agent
 import AI.AgentInquiry as Agent
-import API.Chat.OpenAI as ChatOpenAI
 import Type.Proxy (Proxy(..))
 
-type Class msg states errors queries = Agent.Class states errors (Queries msg queries)
-type Inst msg states errors queries = Agent.Inst states errors (Queries msg queries)
+_chat = Proxy :: Proxy "chat"
+
+type Agent msg states errors queries m = 
+  Agent.Agent states errors (Queries msg queries) m
+
+type ExtensibleAgent msg states errors queries m = 
+  Agent.ExtensibleAgent states errors queries (Queries msg queries) m
 
 type Queries msg queries =
-      ( chat :: Agent.Inquiry (Array msg) msg
-      | queries )
+  ( chat :: Agent.Inquiry (Array msg) msg
+  | queries )
 
--- Queries
-
-_chat = Proxy :: Proxy "chat"
+chat :: forall msg states errors queries m. Monad m => Array msg -> Agent.QueryF states errors (Queries msg queries) m msg
 chat history = Agent.inquire _chat history

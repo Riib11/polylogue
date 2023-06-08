@@ -2,24 +2,25 @@ module AI.Agent.Chat.GPT where
 
 import Prelude
 
-import AI.Agent as Agent
+import AI.Agent (throwError) as Agent
 import AI.Agent.Chat as Chat
-import AI.Agent.Chat as Chat
-import AI.AgentInquiry as Agent
+import AI.AgentInquiry (defineInquiry) as Agent
 import API.Chat.OpenAI as ChatOpenAI
-import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (runExceptT)
-import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Functor.Variant as FV
-import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..))
-import Data.Show.Generic (genericShow)
 import Effect.Aff.Class (class MonadAff)
-import Type.Proxy (Proxy(..))
 
-define config =
-  Agent.addInquiry Chat._chat \history ->
-    runExceptT (ChatOpenAI.chat config history) >>= case _ of
+type ExtensibleAgent states errors queries m = Chat.ExtensibleAgent ChatOpenAI.Message states (Errors errors) queries m
+
+type Errors errors = (chat :: ChatOpenAI.Error | errors)
+
+extend :: forall states errors queries m. 
+  MonadAff m => 
+  { chatOptions :: ChatOpenAI.ChatOptions
+  , client :: ChatOpenAI.Client } -> 
+  Chat.ExtensibleAgent ChatOpenAI.Message states (Errors errors) queries m
+extend params =
+  Agent.defineInquiry Chat._chat \history ->
+    runExceptT (ChatOpenAI.chat params history) >>= case _ of
       Left chatError -> Agent.throwError Chat._chat chatError
       Right reply -> pure reply

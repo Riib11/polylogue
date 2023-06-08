@@ -10,7 +10,7 @@ import Control.Monad.Error.Class (class MonadError, class MonadThrow)
 import Control.Monad.Error.Class as Error
 import Control.Monad.Except (class MonadError, class MonadTrans, ExceptT, lift, runExceptT)
 import Control.Monad.Morph (class MFunctor, class MMonad, embed, hoist)
-import Control.Monad.Reader (ReaderT)
+import Control.Monad.Reader (ReaderT, ask)
 import Control.Monad.State (class MonadState, StateT, get, gets, put, runStateT)
 import Data.Functor.Variant as FV
 import Data.Symbol (class IsSymbol)
@@ -53,21 +53,16 @@ type QueryInput queries a = FV.VariantF queries a
 
 empty = Agent FV.case_
 
-type QueryF states errors queries m a =
-  Agent states errors queries m ->
-  AgentM states errors m a
+type QueryF states errors queries m =
+  ReaderT (Agent states errors queries m) 
+    (AgentM states errors m)
 
-query :: forall label q states errors queries_ queries m a.
-  IsSymbol label => Cons label q queries_ queries => Functor q =>
-  Proxy label -> q a ->
-  QueryF states errors queries m a
-query label q (Agent handleQuery) = handleQuery (FV.inj label q)
+query :: forall label q states errors queries_ queries m a. IsSymbol label => Cons label q queries_ queries => Functor q => Monad m => Proxy label -> q a -> QueryF states errors queries m a
+query label q = do
+  Agent handleQuery <- ask
+  lift (handleQuery (FV.inj label q))
 
-defineQuery :: forall states errors query queryLabel queries_ queries m.
-  IsSymbol queryLabel => Cons queryLabel query queries_ queries =>
-  Proxy queryLabel ->
-  (forall a. query a -> AgentM states errors m a) ->
-  ExtensibleAgent states errors queries_ queries m
+defineQuery :: forall states errors query queryLabel queries_ queries m. IsSymbol queryLabel => Cons queryLabel query queries_ queries => Proxy queryLabel -> (forall a. query a -> AgentM states errors m a) -> ExtensibleAgent states errors queries_ queries m
 defineQuery label handler (Agent subHandler) = Agent (FV.case_
   # const subHandler
   # FV.on label handler)

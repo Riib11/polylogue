@@ -11,15 +11,11 @@ import Type.Proxy (Proxy)
 
 -- | Inquiry
 
-data Inquiry a b c = Inquiry a (b -> c)
-derive instance Functor (Inquiry a b)
+data Inquiry input output output' = Inquiry input (output -> output')
+derive instance Functor (Inquiry input output)
 
+defineInquiry :: forall queries_ queries input states errors queryLabel m output. IsSymbol queryLabel => Cons queryLabel (Inquiry input output) queries_ queries => Functor m => Proxy queryLabel -> (input -> AgentM states errors m output) -> Agent states errors queries_ m -> Agent states errors queries m
 defineInquiry label f = defineQuery label (\(Inquiry a k) -> k <$> f a)
 
-defineInquiry label f = defineQuery label (\(Inquiry a k) -> k <$> f a)
-
-inquire :: forall label input output states errors queries_ queries m.
-  IsSymbol label => Cons label (Inquiry input output) queries_ queries =>
-  Proxy label -> input ->
-  QueryF states errors queries m output
+inquire :: forall label input output states errors queries_ queries m. IsSymbol label => Cons label (Inquiry input output) queries_ queries => Monad m => Proxy label -> input -> QueryF states errors queries m output
 inquire label input = query label (Inquiry input identity)

@@ -1,35 +1,30 @@
 module AI.Agent.Chat.WithMemory where
 
 import Prelude
-
-import AI.Agent as Agent
+import AI.Agent (ExtensibleAgent, QueryF) as Agent
 import AI.Agent.Chat as Chat
 import AI.Agent.Chat.Memory as Memory
 import AI.Agent.Manager as Manager
-import AI.AgentInquiry as Agent
+import AI.AgentInquiry (Inquiry, defineInquiry, inquire) as Agent
 import Data.Traversable (for_)
-import Debug as Debug
-import Prim.Row (class Union)
 import Type.Proxy (Proxy(..))
 
-type Class msg memoryStates memoryErrors memoryQueries chatStates chatErrors chatQueries states errors queries m =
-  Agent.Class (States msg memoryStates memoryErrors memoryQueries chatStates chatErrors queries states m) errors (Queries msg queries) m
+_getHistory = Proxy :: Proxy "getHistory"
 
-type Inst msg memoryStates memoryErrors memoryQueries chatStates chatErrors chatQueries states errors queries m =
-  Agent.Inst (States msg memoryStates memoryErrors memoryQueries chatStates chatErrors queries states m) errors (Queries msg queries) m
+type ExtensibleAgent msg memoryStates memoryQueries chatStates chatQueries states errors queries m = 
+  Agent.ExtensibleAgent (States msg memoryStates memoryQueries chatStates chatQueries errors states m) errors queries (Queries msg queries) m
 
-type ExtensibleClass msg memoryStates memoryErrors memoryQueries chatStates chatErrors chatQueries states errors queries m = 
-  Agent.ExtensibleClass (States msg memoryStates memoryErrors memoryQueries chatStates chatErrors queries states m) errors queries (Queries msg queries) m
-
-type 
+type
   States
     msg
-    memoryStates memoryErrors memoryQueries 
-    chatStates chatErrors chatQueries
-    states m = 
+    memoryStates memoryQueries 
+    chatStates chatQueries
+    errors states m = 
   Manager.States 
-    ( chat :: Chat.Inst msg chatStates chatErrors chatQueries m
-    , memory :: Memory.Inst msg memoryStates memoryErrors memoryQueries m )
+    ( chat :: Chat.Agent msg chatStates errors chatQueries m
+    , memory :: Memory.Agent msg memoryStates errors memoryQueries m )
+    ( chat :: Record chatStates
+    , memory :: Record (Memory.States msg memoryStates) )
     states
 
 _chat = Proxy :: Proxy "chat"
@@ -39,25 +34,23 @@ type Queries msg queries = Chat.Queries msg
   ( getHistory :: Agent.Inquiry Unit (Array msg)
   | queries )
 
-_getHistory = Proxy :: Proxy "getHistory"
+getHistory :: forall msg states errors queries m. Monad m => Agent.QueryF states errors (Queries msg queries) m (Array msg)
 getHistory = Agent.inquire _getHistory unit
 
-define :: forall 
+extend :: forall 
   msg
-  chatStates chatErrors chatErrors_ chatQueries
-  memoryStates memoryErrors_ memoryErrors memoryQueries
+  chatStates chatQueries
+  memoryStates memoryQueries
   states errors queries m.
-  Union memoryErrors memoryErrors_ errors =>
-  Union chatErrors chatErrors_ errors =>
   Monad m =>
-  ExtensibleClass msg memoryStates memoryErrors memoryQueries chatStates chatErrors chatQueries states errors queries m
-define =
-  (Agent.addInquiry Chat._chat \msgs -> do
-    for_ msgs (Manager.subInquire _memory Memory._append)
-    history <- Manager.subInquire _memory Memory._get unit
-    response <- Manager.subInquire _chat Chat._chat history
-    Manager.subInquire _memory Memory._append response
+  ExtensibleAgent msg memoryStates memoryQueries chatStates chatQueries states errors queries m
+extend =
+  (Agent.defineInquiry Chat._chat \msgs -> do
+    for_ msgs \msg -> Manager.subDo _memory $ Memory.append msg
+    history <- Manager.subDo _memory Memory.get
+    response <- Manager.subDo _chat $ Chat.chat history
+    Manager.subDo _memory $ Memory.append response
     pure response) >>>
-  (Agent.addInquiry _getHistory \_ -> do
-    Manager.subInquire _memory Memory._get unit)
+  (Agent.defineInquiry _getHistory \_ -> do
+    Manager.subDo _memory Memory.get)
 
