@@ -19,7 +19,7 @@ import Debug as Debug
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
 import Hole (hole)
-import Prim.Row (class Cons, class Union)
+import Prim.Row (class Cons, class Nub, class Union)
 import Record as R
 import Record.Unsafe.Union as UnsafeUnion
 import Type.Proxy (Proxy)
@@ -53,11 +53,18 @@ type QueryInput queries a = FV.VariantF queries a
 
 empty = Agent FV.case_
 
-query input (Agent handleQuery) = handleQuery input
+type QueryF states errors queries m a =
+  Agent states errors queries m ->
+  AgentM states errors m a
+
+query :: forall label q states errors queries_ queries m a.
+  IsSymbol label => Cons label q queries_ queries => Functor q =>
+  Proxy label -> q a ->
+  QueryF states errors queries m a
+query label q (Agent handleQuery) = handleQuery (FV.inj label q)
 
 defineQuery :: forall states errors query queryLabel queries_ queries m.
-  IsSymbol queryLabel =>
-  Cons queryLabel query queries_ queries =>
+  IsSymbol queryLabel => Cons queryLabel query queries_ queries =>
   Proxy queryLabel ->
   (forall a. query a -> AgentM states errors m a) ->
   ExtensibleAgent states errors queries_ queries m
@@ -93,7 +100,25 @@ derive newtype instance Monad m => MonadError (V.Variant errors) (AgentM states 
 instance MonadTrans (AgentM states errors) where
   lift = lift >>> lift >>> AgentM
 
-runAgentM states (AgentM m) = (runExceptT >>> flip runStateT states) m
+type Runner states errors m a =
+  AgentM states errors m a -> 
+  m ((V.Variant errors \/ a) /\ Record states)
+
+run :: forall states errors m a. Record states -> Runner states errors m a
+run states (AgentM m) = (runExceptT >>> flip runStateT states) m
+
+type ExtensibleRunner states2 states3 errors m a =
+  Record states2 ->
+  AgentM states3 errors m a ->
+  m ((V.Variant errors \/ a) /\ Record states3)
+
+run' :: 
+  forall states1 states2 states3 errors m a.
+  Union states1 states2 states3 =>
+  Nub states3 states3 =>
+  Record states1 ->
+  ExtensibleRunner states2 states3 errors m a
+run' states1 states2 = run (R.merge states1 states2)
 
 throwError :: forall label states error errors' errors m a.
   IsSymbol label => Cons label error errors' errors =>
@@ -114,7 +139,7 @@ expandAgentM_states :: forall states1 states2 states errors m a.
   AgentM states errors m a
 expandAgentM_states _ m = AgentM do
   states <- get
-  res /\ states' <- (lift >>> lift) (runAgentM (Coerce.unsafeCoerce states) m)
+  res /\ states' <- (lift >>> lift) (run (Coerce.unsafeCoerce states) m)
   -- Leaves `states1` untouched, and overwrites `state2` with the result
   -- state from `m`
   put $ UnsafeUnion.unsafeUnion states states'
@@ -130,7 +155,7 @@ expandAgentM_errors :: forall states errors1 errors2 errors queries m a.
   AgentM states errors m a
 expandAgentM_errors _ m = AgentM do
   states <- get
-  res /\ states' <- (lift >>> lift) (runAgentM (Coerce.unsafeCoerce states) m)
+  res /\ states' <- (lift >>> lift) (run (Coerce.unsafeCoerce states) m)
   -- Leaves `states1` untouched, and overwrites `state2` with the result
   -- state from `m`
   put $ UnsafeUnion.unsafeUnion states states'
@@ -173,7 +198,7 @@ expandAgentM proxy_states proxy_errors =
 --   m a
 -- subQuery label input = do
 --   agent /\ states <- gets (R.get label)
---   -- lift (runAgentM states (query input agent)) >>= case _ of
+--   -- lift (run states (query input agent)) >>= case _ of
 --   --   _ -> ?a
 --   ?a
 

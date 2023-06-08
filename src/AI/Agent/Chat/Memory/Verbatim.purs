@@ -11,11 +11,19 @@ import Data.Array as Array
 import Record as R
 import Type.Proxy (Proxy(..))
 
--- | Maintains the entire chat history.
-define :: forall msg states errors queries m. Monad m => 
-  Agent.ExtensibleClass (history :: Array msg | states) errors queries (Memory.Queries msg queries) m
-define =
-  (Agent.addInquiry Memory._get \_ -> gets _.history) >>>
-  (Agent.addInquiry Memory._append \msg -> modify_ (R.modify _history (_ `Array.snoc` msg)))
+-- | A Memory agent that maintains the entire chat history.
+
+extend :: forall msg states errors queries m.
+  Monad m =>
+  Agent.ExtensibleAgent states errors queries (Memory.Queries msg queries) m
+extend =
+  (Agent.defineInquiry Memory._get \_ -> ) >>>
+  (Agent.defineInquiry Memory._append ?a)
+
+-- define :: forall msg states errors queries m. Monad m => 
+--   Agent.ExtensibleClass (history :: Array msg | states) errors queries (Memory.Queries msg queries) m
+-- define =
+--   (Agent.addInquiry Memory._get \_ -> gets _.history) >>>
+--   (Agent.addInquiry Memory._append \msg -> modify_ (R.modify _history (_ `Array.snoc` msg)))
 
 _history = Proxy :: Proxy "history"

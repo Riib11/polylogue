@@ -31,7 +31,7 @@ subQuery :: forall subLabel subStates subQueries agents agents_ states errors m 
   Agent.AgentM (States agents states) errors m a
 subQuery subLabel input = do
   agent /\ states <- gets (_.agents >>> R.get subLabel)
-  lift (Agent.runAgentM states (Agent.query input agent)) >>= \(res /\ states') -> do
+  lift (Agent.run states (Agent.query input agent)) >>= \(res /\ states') -> do
     modify_ $ R.modify _agents $ R.set subLabel (agent /\ states')
     case res of
       Left err -> throwError err
