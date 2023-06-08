@@ -15,5 +15,5 @@ type Queries msg queries = Agent.Queries
   ( chat :: Agent.Inquiry (Array msg) msg
   | queries )
 
-chat :: forall msg states errors queries m. Monad m => Array msg -> Agent.QueryF states errors (Queries msg queries) m msg
+chat :: forall msg states errors queries m. Monad m => Array msg -> Agent.QueryF (States states) (Errors errors) (Queries msg queries) m msg
 chat history = Agent.inquire _chat history
