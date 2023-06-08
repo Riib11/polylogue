@@ -1,7 +1,8 @@
 module AI.Agent.Chat.WithMemory where
 
 import Prelude
-import AI.Agent (ExtensibleAgent, QueryF) as Agent
+
+import AI.Agent as Agent
 import AI.Agent.Chat as Chat
 import AI.Agent.Chat.Memory as Memory
 import AI.Agent.Manager as Manager
@@ -10,9 +11,8 @@ import Data.Traversable (for_)
 import Type.Proxy (Proxy(..))
 
 _getHistory = Proxy :: Proxy "getHistory"
-
-type ExtensibleAgent msg memoryStates memoryQueries chatStates chatQueries states errors queries m = 
-  Agent.ExtensibleAgent (States msg memoryStates memoryQueries chatStates chatQueries errors states m) errors queries (Queries msg queries) m
+_chat = Proxy :: Proxy "chat"
+_memory = Proxy :: Proxy "memory"
 
 type
   States
@@ -21,18 +21,17 @@ type
     chatStates chatQueries
     errors states m = 
   Manager.States 
-    ( chat :: Chat.Agent msg chatStates errors chatQueries m
-    , memory :: Memory.Agent msg memoryStates errors memoryQueries m )
+    ( chat :: Agent.Agent (Chat.States chatStates) (Chat.Errors errors) (Chat.Queries msg chatQueries) m
+    , memory :: Agent.Agent (Memory.States msg memoryStates) (Memory.Errors errors) (Memory.Queries msg memoryQueries) m )
     ( chat :: Record chatStates
     , memory :: Record (Memory.States msg memoryStates) )
     states
 
-_chat = Proxy :: Proxy "chat"
-_memory = Proxy :: Proxy "memory"
-
 type Queries msg queries = Chat.Queries msg
   ( getHistory :: Agent.Inquiry Unit (Array msg)
   | queries )
+
+type Errors errors = Chat.Errors errors
 
 getHistory :: forall msg states errors queries m. Monad m => Agent.QueryF states errors (Queries msg queries) m (Array msg)
 getHistory = Agent.inquire _getHistory unit
@@ -43,7 +42,7 @@ extend :: forall
   memoryStates memoryQueries
   states errors queries m.
   Monad m =>
-  ExtensibleAgent msg memoryStates memoryQueries chatStates chatQueries states errors queries m
+  Agent.ExtensibleAgent (States msg memoryStates memoryQueries chatStates chatQueries errors states m) errors queries (Queries msg queries) m
 extend =
   (Agent.defineInquiry Chat._chat \msgs -> do
     for_ msgs \msg -> Manager.subDo _memory $ Memory.append msg
@@ -53,4 +52,3 @@ extend =
     pure response) >>>
   (Agent.defineInquiry _getHistory \_ -> do
     Manager.subDo _memory Memory.get)
-

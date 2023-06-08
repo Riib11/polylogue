@@ -23,14 +23,16 @@ import Type.Proxy (Proxy(..))
 _allSubAgents = Proxy :: Proxy "allSubAgents"
 _allSubStates = Proxy :: Proxy "allSubStates"
 
-type ExtensibleAgent allSubAgents allSubStates states errors queries queries_ m = Agent.ExtensibleAgent (States allSubAgents allSubStates states) errors queries_ queries m
-
 type States allSubAgents (allSubStates :: Row Type) states = 
   ( allSubAgents :: Record allSubAgents
   , allSubStates :: Record allSubStates
   | states )
 
-subDo :: forall subLabel subStates subQueries allSubAgents allSubAgents_ allSubStates allSubStates_ states errors m a. IsSymbol subLabel => Cons subLabel (Agent.Agent subStates errors subQueries m) allSubAgents_ allSubAgents => Cons subLabel (Record subStates) allSubStates_ allSubStates => Monad m => Proxy subLabel -> (Agent.QueryF subStates errors subQueries m a) -> Agent.AgentM (States allSubAgents allSubStates states) errors m a
+type Errors errors = Agent.Errors errors
+
+type Queries queries = Agent.Queries queries
+
+subDo :: forall subLabel subStates subQueries allSubAgents allSubAgents_ allSubStates allSubStates_ states errors m a. IsSymbol subLabel => Cons subLabel (Agent.Agent subStates errors subQueries m) allSubAgents_ allSubAgents => Cons subLabel (Record subStates) allSubStates_ allSubStates => Monad m => Proxy subLabel -> (Agent.QueryF subStates errors subQueries m a) -> Agent.AgentM (States allSubAgents allSubStates states) (Errors errors) m a
 subDo subLabel m = do
   subagent <- gets (_.allSubAgents >>> R.get subLabel)
   allSubStates <- gets (_.allSubStates >>> R.get subLabel)

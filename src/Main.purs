@@ -16,6 +16,7 @@ import AI.Agent.Manager as Manager
 import AI.AgentInquiry as Agent
 import API.Chat.OpenAI as ChatOpenAI
 import Control.Monad.Except (ExceptT, runExceptT)
+import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (gets, runStateT)
 import Control.Plus (empty)
 import Data.Either (Either(..))
@@ -34,9 +35,81 @@ import Hole (hole)
 import Node.Process as Process
 import Node.ReadLine as ReadLine
 import Partial.Unsafe (unsafePartial)
+import Text.Pretty (bullets)
 import Type.Proxy (Proxy(..))
 
+-- | Example: Manager, ChatWithMemory, CommandLine
 
+_main = Proxy :: Proxy "main"
+_start = Proxy :: Proxy "start"
+_chat = Proxy :: Proxy "chat"
+_user = Proxy :: Proxy "user"
+_assistant = Proxy :: Proxy "assistant"
+
+type Message = String
+type Errors = CommandLine.Errors ()
+
+-- type MasterAllSubAgents = (user :: _, assistant :: _)
+-- type MasterAllSubStates = (user :: _, assistant :: _)
+
+main :: Effect.Effect Unit
+main = Aff.launchAff_ do
+  let
+    user :: Agent.Agent (CommandLine.States ()) (CommandLine.Errors ()) (CommandLine.Queries ()) Aff.Aff
+    user = Agent.empty 
+      # CommandLine.extend 
+          { interfaceOptions: 
+              ReadLine.output := Process.stdout <>
+              ReadLine.terminal := true }
+
+  let 
+    assistant :: Agent.Agent (ChatWithMemory.States Message _ _ _ _ _ _ Aff.Aff) (ChatWithMemory.Errors Errors) (ChatWithMemory.Queries Message ()) Aff.Aff
+    assistant = Agent.empty # ChatWithMemory.extend
+
+  let
+    master :: Agent.Agent (Manager.States (user :: _, assistant :: _) (user :: _, assistant :: _) ()) (Manager.Errors Errors) (Manager.Queries (main :: Agent.Inquiry Unit Unit)) Aff.Aff
+    master = Agent.empty #
+      Agent.defineInquiry _main \_ -> do
+        Manager.subDo _user $ CommandLine.open
+        
+        prompt <- Manager.subDo _user $ Chat.chat ["Q: "]
+        response <- Manager.subDo _assistant $ Chat.chat [prompt]
+        Console.log $ "A: " <> response
+
+        prompt <- Manager.subDo _user $ Chat.chat ["Q: "]
+        response <- Manager.subDo _assistant $ Chat.chat [prompt]
+        Console.log $ "A: " <> response
+
+        prompt <- Manager.subDo _user $ Chat.chat ["Q: "]
+        response <- Manager.subDo _assistant $ Chat.chat [prompt]
+        Console.log $ "A: " <> response
+        
+        prompt <- Manager.subDo _user $ Chat.chat ["Q: "]
+        response <- Manager.subDo _assistant $ Chat.chat [prompt]
+        Console.log $ "A: " <> response
+
+        history <- Manager.subDo _assistant $ ChatWithMemory.getHistory
+        Console.log $ "history:" <> (bullets history)
+
+        Manager.subDo _user $ CommandLine.close
+
+  Agent.catchingRun (\(err /\ _states) -> Console.log $ "error: " <> show err)
+    { allSubAgents: {assistant, user}
+    , allSubStates:
+        { user: {interface: Nothing} 
+        , assistant:
+            { allSubAgents:
+                { chat: Agent.empty # Echo.extend {default: "echo error: empty history"}
+                , memory: Agent.empty # Verbatim.extend }
+            , allSubStates:
+                { chat: {}
+                , memory: Memory.extendInit {} {} }} }
+    }
+    (runReaderT (Agent.inquire _main unit) master)
+
+  pure unit
+
+{-
 -- | Example: Manager, ChatWithMemory, CommandLine
 
 _test = Proxy :: Proxy "test"
@@ -74,8 +147,6 @@ main = Aff.launchAff_ do
       Manager.subInquire _user CommandLine._open unit
       prompt <- Manager.subInquire _user Chat._chat ["Q: "]
       response <- Manager.subInquire _
-
-
       
       -- response <- chat#Chat.chat ["A"]
       -- Console.log response
@@ -96,6 +167,9 @@ main = Aff.launchAff_ do
     master#Agent.unsafeRun do
       manager#Agent.inquire _start unit
       pure unit
+
+  pure unit
+-}
 
 
 {-

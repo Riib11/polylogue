@@ -1,33 +1,30 @@
 module AI.Agent where
 
-import Data.Either
-import Data.Either.Nested
-import Data.Tuple.Nested
+import Data.Either (Either(..))
+import Data.Either.Nested (type (\/))
+import Data.Tuple.Nested (type (/\), (/\))
 import Prelude
-
-import Control.Bug (bug)
-import Control.Monad.Error.Class (class MonadError, class MonadThrow)
+import Control.Monad.Error.Class (class MonadThrow)
 import Control.Monad.Error.Class as Error
 import Control.Monad.Except (class MonadError, class MonadTrans, ExceptT, lift, runExceptT)
-import Control.Monad.Morph (class MFunctor, class MMonad, embed, hoist)
 import Control.Monad.Reader (ReaderT, ask)
-import Control.Monad.State (class MonadState, StateT, get, gets, put, runStateT)
+import Control.Monad.State (class MonadState, StateT, runStateT)
 import Data.Functor.Variant as FV
 import Data.Symbol (class IsSymbol)
 import Data.Variant as V
-import Debug as Debug
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
-import Hole (hole)
 import Prim.Row (class Cons, class Nub, class Union)
 import Record as R
-import Record.Unsafe.Union as UnsafeUnion
 import Type.Proxy (Proxy)
-import Unsafe.Coerce as Coerce
 
 --------------------------------------------------------------------------------
 -- Agent
 --------------------------------------------------------------------------------
+
+type States (states :: Row Type) = states
+type Errors (errors :: Row Type) = errors
+type Queries (queries :: Row (Type -> Type)) = queries
 
 -- | An agent specification.
 data
@@ -102,18 +99,24 @@ type Runner states errors m a =
 run :: forall states errors m a. Record states -> Runner states errors m a
 run states (AgentM m) = (runExceptT >>> flip runStateT states) m
 
-type ExtensibleRunner states2 states3 errors m a =
-  Record states2 ->
-  AgentM states3 errors m a ->
-  m ((V.Variant errors \/ a) /\ Record states3)
+catchingRun k states agent = run states agent >>= case _ of
+  Left err /\ states -> k (err /\ states)
+  Right a /\ states -> pure a
 
-run' :: 
-  forall states1 states2 states3 errors m a.
+type Initialization (states :: Row Type) m = m (Record states)
+
+init :: forall states m. Applicative m => Record states -> Initialization states m
+init = pure
+
+type ExtensibleInitialization states2 states3 m = Record states2 -> m (Record states3)
+
+extendInit :: forall states1 states2 states3 m.
   Union states1 states2 states3 =>
   Nub states3 states3 =>
+  Applicative m =>
   Record states1 ->
-  ExtensibleRunner states2 states3 errors m a
-run' states1 states2 = run (R.merge states1 states2)
+  ExtensibleInitialization states2 states3 m
+extendInit states1 states2 = init (R.merge states1 states2)
 
 throwError :: forall label states error errors' errors m a.
   IsSymbol label => Cons label error errors' errors =>

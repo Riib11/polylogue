@@ -1,8 +1,9 @@
+-- | A chat agent interface to the user's command line.
 module AI.Agent.Chat.CommandLine where
 
 import Prelude
 
-import AI.Agent (ExtensibleAgent, QueryF) as Agent
+import AI.Agent as Agent
 import AI.Agent.Chat as Chat
 import AI.AgentInquiry (Inquiry, defineInquiry, inquire) as Agent
 import Control.Monad.Error.Class (throwError)
@@ -19,6 +20,7 @@ import Node.Process as Process
 import Node.ReadLine as CommandLine
 import Node.ReadLine as ReadLine
 import Node.ReadLine.Aff as ReadLineAff
+import Prim.Row (class Nub)
 import Type.Proxy (Proxy(..))
 
 _interface = Proxy :: Proxy "interface"
@@ -26,14 +28,11 @@ _commandLine = Proxy :: Proxy "commandLine"
 _open = Proxy :: Proxy "open"
 _close = Proxy :: Proxy "close"
 
-type ExtensibleAgent states errors queries m =
-  Agent.ExtensibleAgent (States states) (Errors errors) queries (Queries queries) m
-
-type States states =
+type States states = Chat.States
   ( interface :: Maybe ReadLine.Interface 
   | states )
 
-type Errors errors = 
+type Errors errors = Chat.Errors
   ( commandLine :: Error 
   | errors )
 
@@ -45,7 +44,7 @@ type Queries queries = Chat.Queries String
 extend :: forall states errors queries m.
   MonadEffect m => MonadAff m =>
   { interfaceOptions :: Options CommandLine.InterfaceOptions } ->
-  ExtensibleAgent states errors queries m
+  Agent.ExtensibleAgent (States states) (Errors errors) queries (Queries queries) m
 extend params =
   (Agent.defineInquiry _open \_ -> do
     gets _.interface >>= case _ of
@@ -62,10 +61,13 @@ extend params =
     Nothing -> throwError $ V.inj _commandLine err
     Just interface -> pure interface
 
-open :: forall states errors queries m. Agent.QueryF (States states) (Errors errors) (Queries queries) m Unit
+extendInit :: forall states m. Applicative m => Nub (States states) (States states) => Agent.ExtensibleInitialization states (States states) m
+extendInit = Agent.extendInit {interface: Nothing}
+
+open :: forall states errors queries m. Monad m => Agent.QueryF (States states) (Errors errors) (Queries queries) m Unit
 open = Agent.inquire _open unit
 
-close :: forall states errors queries m. Agent.QueryF (States states) (Errors errors) (Queries queries) m Unit
+close :: forall states errors queries m. Monad m => Agent.QueryF (States states) (Errors errors) (Queries queries) m Unit
 close = Agent.inquire _close unit
 
 data Error
