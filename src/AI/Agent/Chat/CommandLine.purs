@@ -13,6 +13,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Options (Options)
 import Data.Show.Generic (genericShow)
+import Data.Traversable (traverse)
 import Data.Variant as V
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
@@ -36,15 +37,17 @@ type Errors errors = Chat.Errors
   ( commandLine :: Error 
   | errors )
 
-type Queries queries = Chat.Queries String
+type Queries msg queries = Chat.Queries msg
   ( open :: Agent.Inquiry Unit Unit
   , close :: Agent.Inquiry Unit Unit
   | queries )
 
-extend :: forall states errors queries m.
+extend :: forall msg states errors queries m.
   MonadEffect m => MonadAff m =>
-  { interfaceOptions :: Options CommandLine.InterfaceOptions } ->
-  Agent.ExtensibleAgent (States states) (Errors errors) queries (Queries queries) m
+  { interfaceOptions :: Options CommandLine.InterfaceOptions 
+  , show :: msg -> Agent.AgentM (States states) (Errors errors) m String
+  , parse :: String -> Agent.AgentM (States states) (Errors errors) m msg } ->
+  Agent.ExtensibleAgent (States states) (Errors errors) queries (Queries msg queries) m
 extend params =
   (Agent.defineInquiry _open \_ -> do
     gets _.interface >>= case _ of
@@ -53,7 +56,10 @@ extend params =
         interface <- liftEffect $ ReadLine.createInterface Process.stdin params.interfaceOptions
         modify_ _{interface = Just interface}) >>>
   (Agent.defineInquiry Chat._chat \prompts -> do
-    ReadLineAff.question (Array.intercalate "\n\n" prompts) =<< getInterface QuestionWhenClosed) >>>
+    interface <- getInterface QuestionWhenClosed
+    strs <- params.show `traverse` prompts
+    str <- ReadLineAff.question (Array.intercalate "\n\n" strs) interface
+    params.parse str) >>>
   (Agent.defineInquiry _close \_ -> do
     ReadLineAff.close =<< getInterface CloseWhenClosed)
   where
@@ -64,10 +70,10 @@ extend params =
 extendInit :: forall states m. Applicative m => Nub (States states) (States states) => Agent.ExtensibleInitialization states (States states) m
 extendInit = Agent.extendInit {interface: Nothing}
 
-open :: forall states errors queries m. Monad m => Agent.QueryF (States states) (Errors errors) (Queries queries) m Unit
+open :: forall msg states errors queries m. Monad m => Agent.QueryF (States states) (Errors errors) (Queries msg queries) m Unit
 open = Agent.inquire _open unit
 
-close :: forall states errors queries m. Monad m => Agent.QueryF (States states) (Errors errors) (Queries queries) m Unit
+close :: forall msg states errors queries m. Monad m => Agent.QueryF (States states) (Errors errors) (Queries msg queries) m Unit
 close = Agent.inquire _close unit
 
 data Error

@@ -1,22 +1,24 @@
 module AI.Agent where
 
-import Data.Either (Either(..))
-import Data.Either.Nested (type (\/))
-import Data.Tuple.Nested (type (/\), (/\))
 import Prelude
+
 import Control.Monad.Error.Class (class MonadThrow)
 import Control.Monad.Error.Class as Error
 import Control.Monad.Except (class MonadError, class MonadTrans, ExceptT, lift, runExceptT)
 import Control.Monad.Reader (ReaderT, ask)
 import Control.Monad.State (class MonadState, StateT, runStateT)
+import Data.Either (Either(..))
+import Data.Either.Nested (type (\/))
 import Data.Functor.Variant as FV
 import Data.Symbol (class IsSymbol)
+import Data.Tuple.Nested (type (/\), (/\))
 import Data.Variant as V
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
 import Prim.Row (class Cons, class Nub, class Union)
 import Record as R
 import Type.Proxy (Proxy)
+import Unsafe.Coerce (unsafeCoerce)
 
 --------------------------------------------------------------------------------
 -- Agent
@@ -64,6 +66,11 @@ defineQuery label handler (Agent subHandler) = Agent (FV.case_
   # const subHandler
   # FV.on label handler)
 
+overrideQuery :: forall states errors query query' queryLabel queries_ queries queries' m. IsSymbol queryLabel => Cons queryLabel query queries_ queries => Cons queryLabel query' queries_ queries' => Monad m => Functor query => Proxy queryLabel -> ((forall a. query a -> AgentM states errors m a) -> (forall a'. query' a' -> AgentM states errors m a')) -> Agent states errors queries m -> Agent states errors queries' m
+overrideQuery label overrideHandler (Agent subHandler) = Agent (FV.case_
+  # const (subHandler <<< unsafeCoerce)
+  # FV.on label (overrideHandler (subHandler <<< (FV.inj label))))
+
 --------------------------------------------------------------------------------
 -- AgentM
 --------------------------------------------------------------------------------
@@ -102,6 +109,7 @@ run states (AgentM m) = (runExceptT >>> flip runStateT states) m
 catchingRun k states agent = run states agent >>= case _ of
   Left err /\ states -> k (err /\ states)
   Right a /\ states -> pure a
+
 
 type Initialization (states :: Row Type) m = m (Record states)
 

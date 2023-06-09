@@ -1,5 +1,5 @@
 -- | A manager agent maintains a state with labeled sub-agent instances.
-module AI.Agent.Manager where
+module AI.Agent.Control.Manager where
 
 import Data.Tuple.Nested
 import Prelude
@@ -20,23 +20,21 @@ import Prim.Row (class Cons, class Union)
 import Record as R
 import Type.Proxy (Proxy(..))
 
-_allSubAgents = Proxy :: Proxy "allSubAgents"
+-- _allSubAgents = Proxy :: Proxy "allSubAgents"
 _allSubStates = Proxy :: Proxy "allSubStates"
 
-type States allSubAgents (allSubStates :: Row Type) states = 
-  ( allSubAgents :: Record allSubAgents
-  , allSubStates :: Record allSubStates
+type States (allSubStates :: Row Type) states = 
+  ( allSubStates :: Record allSubStates
   | states )
 
 type Errors errors = Agent.Errors errors
 
 type Queries queries = Agent.Queries queries
 
-subDo :: forall subLabel subStates subQueries allSubAgents allSubAgents_ allSubStates allSubStates_ states errors m a. IsSymbol subLabel => Cons subLabel (Agent.Agent subStates errors subQueries m) allSubAgents_ allSubAgents => Cons subLabel (Record subStates) allSubStates_ allSubStates => Monad m => Proxy subLabel -> (Agent.QueryF subStates errors subQueries m a) -> Agent.AgentM (States allSubAgents allSubStates states) (Errors errors) m a
-subDo subLabel m = do
-  subagent <- gets (_.allSubAgents >>> R.get subLabel)
+subDo :: forall subLabel subStates subQueries allSubAgents allSubAgents_ allSubStates allSubStates_ states errors m a. IsSymbol subLabel => Cons subLabel (Agent.Agent subStates errors subQueries m) allSubAgents_ allSubAgents => Cons subLabel (Record subStates) allSubStates_ allSubStates => Monad m => Agent.Agent subStates errors subQueries m -> Proxy subLabel -> (Agent.QueryF subStates errors subQueries m a) -> Agent.AgentM (States allSubStates states) (Errors errors) m a
+subDo subAgent subLabel m = do
   allSubStates <- gets (_.allSubStates >>> R.get subLabel)
-  lift (Agent.run allSubStates (runReaderT m subagent)) >>= \(res /\ allSubStates') -> do
+  lift (Agent.run allSubStates (runReaderT m subAgent)) >>= \(res /\ allSubStates') -> do
     modify_ $ R.modify _allSubStates $ R.set subLabel allSubStates'
     case res of
       Left err -> throwError err

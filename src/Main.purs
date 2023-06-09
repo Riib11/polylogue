@@ -7,12 +7,14 @@ import Prelude
 import AI.Agent as Agent
 import AI.Agent.Chat as Chat
 import AI.Agent.Chat.CommandLine as CommandLine
+import AI.Agent.Chat.Dialogue as Dialogue
 import AI.Agent.Chat.Echo as Echo
 import AI.Agent.Chat.GPT as GPT
 import AI.Agent.Chat.Memory as Memory
 import AI.Agent.Chat.Memory.Verbatim as Verbatim
 import AI.Agent.Chat.WithMemory as ChatWithMemory
-import AI.Agent.Manager as Manager
+import AI.Agent.Control.Main as Main
+import AI.Agent.Control.Manager as Manager
 import AI.AgentInquiry as Agent
 import API.Chat.OpenAI as ChatOpenAI
 import Control.Monad.Except (ExceptT, runExceptT)
@@ -38,6 +40,92 @@ import Partial.Unsafe (unsafePartial)
 import Text.Pretty (bullets)
 import Type.Proxy (Proxy(..))
 
+type Message = ChatOpenAI.Message
+type Errors = GPT.Errors (CommandLine.Errors ())
+
+--
+-- dialogue
+--
+
+type Dialogue = Agent.Agent DialogueStates Errors (Dialogue.Queries ()) Aff.Aff
+type DialogueStates = Dialogue.States UserStates AssistantStates ()
+
+dialogue :: ChatOpenAI.Client -> Dialogue
+dialogue client = Agent.empty #
+  Dialogue.extend
+    { agent1
+    , agent2
+    , setup: pure unit
+    , cleanup: pure unit
+    , initReply2: ChatOpenAI.assistantMessage "I am the assistant."
+    , handle1: \msg -> pure (Just msg)
+    , handle2: \msg -> pure (Just msg)
+    } # 
+  Agent.overrideInquiry Main._main \super _ -> do
+    Manager.subDo agent1 Dialogue._agent1 CommandLine.open
+    super unit
+    Manager.subDo agent1 Dialogue._agent1 CommandLine.close
+  where
+    agent1 = user
+    agent2 = assistant client
+
+--
+-- User
+--
+
+type User = Agent.Agent UserStates Errors UserQueries Aff.Aff
+type UserStates = CommandLine.States ()
+type UserQueries = CommandLine.Queries Message ()
+
+user :: User
+user = Agent.empty # 
+  CommandLine.extend
+    { interfaceOptions: 
+        ReadLine.output := Process.stdout <>
+        ReadLine.terminal := true
+  , parse: pure <<< ChatOpenAI.userMessage
+  , show: pure <<< _.content }
+
+--
+-- Assistant
+--
+
+type Assistant = Agent.Agent AssistantStates Errors AssistantQueries Aff.Aff
+type AssistantStates = ChatWithMemory.States Message () () ()
+type AssistantQueries = ChatWithMemory.Queries Message ()
+
+assistant :: ChatOpenAI.Client -> Assistant
+assistant client = Agent.empty # 
+  ChatWithMemory.extend
+    { chat: Agent.empty # 
+        GPT.extend
+          { client
+          , chatOptions: ChatOpenAI.defaultChatOptions }
+    , memory: Agent.empty # 
+        Verbatim.extend }
+
+--
+-- main
+--
+
+main :: Effect.Effect Unit
+main = Aff.launchAff_ do
+  Dotenv.loadFile
+  client <- liftEffect $ ChatOpenAI.makeClient Nothing
+  userStates <- CommandLine.extendInit {}
+  memoryStates <- Memory.extendInit {}
+  Agent.catchingRun 
+    (\(err /\ _states) -> Console.log $ "error: " <> show err)
+    { allSubStates: 
+        { agent1: userStates
+        , agent2:
+            { allSubStates:
+                { chat: {} 
+                , memory: memoryStates } } } }
+    (Main.runMain (dialogue client))
+  pure unit
+
+{-
 -- | Example: Manager, ChatWithMemory, CommandLine
 
 _main = Proxy :: Proxy "main"
@@ -110,6 +198,7 @@ main = Aff.launchAff_ do
     (runReaderT (Agent.inquire _main unit) master)
 
   pure unit
+-}
 
 {-
 -- | Example: Manager, ChatWithMemory, CommandLine
