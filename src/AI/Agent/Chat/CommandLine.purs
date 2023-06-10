@@ -45,8 +45,8 @@ type Queries msg queries = Chat.Queries msg
 extend :: forall msg states errors queries m.
   MonadEffect m => MonadAff m =>
   { interfaceOptions :: Options CommandLine.InterfaceOptions 
-  , show :: msg -> Agent.AgentM (States states) (Errors errors) m String
-  , parse :: String -> Agent.AgentM (States states) (Errors errors) m msg } ->
+  , parse :: String -> Agent.AgentM (States states) (Errors errors) m msg
+  , makePrompt :: Array msg -> Agent.AgentM (States states) (Errors errors) m String } ->
   Agent.ExtensibleAgent (States states) (Errors errors) queries (Queries msg queries) m
 extend params =
   (Agent.defineInquiry _open \_ -> do
@@ -55,10 +55,10 @@ extend params =
       Nothing -> do
         interface <- liftEffect $ ReadLine.createInterface Process.stdin params.interfaceOptions
         modify_ _{interface = Just interface}) >>>
-  (Agent.defineInquiry Chat._chat \prompts -> do
+  (Agent.defineInquiry Chat._chat \msgs -> do
     interface <- getInterface QuestionWhenClosed
-    strs <- params.show `traverse` prompts
-    str <- ReadLineAff.question (Array.intercalate "\n\n" strs) interface
+    prompt <- params.makePrompt msgs
+    str <- ReadLineAff.question prompt interface
     params.parse str) >>>
   (Agent.defineInquiry _close \_ -> do
     ReadLineAff.close =<< getInterface CloseWhenClosed)

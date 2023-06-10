@@ -21,7 +21,9 @@ import Control.Monad.Except (ExceptT, runExceptT)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (gets, runStateT)
 import Control.Plus (empty)
+import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Foldable (for_)
 import Data.Functor.Variant as FV
 import Data.Maybe (Maybe(..))
 import Data.Tuple (fst, snd)
@@ -51,20 +53,19 @@ type Dialogue = Agent.Agent DialogueStates Errors (Dialogue.Queries ()) Aff.Aff
 type DialogueStates = Dialogue.States UserStates AssistantStates ()
 
 dialogue :: ChatOpenAI.Client -> Dialogue
-dialogue client = Agent.empty #
-  Dialogue.extend
-    { agent1
-    , agent2
-    , setup: pure unit
-    , cleanup: pure unit
-    , initReply2: ChatOpenAI.assistantMessage "I am the assistant."
-    , handle1: \msg -> pure (Just msg)
-    , handle2: \msg -> pure (Just msg)
-    } # 
-  Agent.overrideInquiry Main._main \super _ -> do
-    Manager.subDo agent1 Dialogue._agent1 CommandLine.open
-    super unit
-    Manager.subDo agent1 Dialogue._agent1 CommandLine.close
+dialogue client = Agent.empty
+  # Dialogue.extend
+      { agent1
+      , agent2
+      , setup: pure unit
+      , cleanup: pure unit
+      , initialReply2: ChatOpenAI.assistantMessage "I am the assistant."
+      , processMessageFrom1To2: \msg -> pure (Just msg)
+      , processMessageFrom2To1: \msg -> pure (Just msg) }
+  # Agent.overrideInquiry Main._main \super _ -> do
+      Manager.subDo agent1 Dialogue._agent1 CommandLine.open
+      super unit
+      Manager.subDo agent1 Dialogue._agent1 CommandLine.close
   where
     agent1 = user
     agent2 = assistant client
@@ -78,13 +79,15 @@ type UserStates = CommandLine.States ()
 type UserQueries = CommandLine.Queries Message ()
 
 user :: User
-user = Agent.empty # 
-  CommandLine.extend
-    { interfaceOptions: 
-        ReadLine.output := Process.stdout <>
-        ReadLine.terminal := true
-  , parse: pure <<< ChatOpenAI.userMessage
-  , show: pure <<< _.content }
+user = Agent.empty
+  # CommandLine.extend
+      { interfaceOptions: 
+          ReadLine.output := Process.stdout <>
+          ReadLine.terminal := true
+    , parse: pure <<< ChatOpenAI.userMessage
+    , makePrompt: \msgs -> do
+        for_ msgs \msg -> Console.log $ "A: " <> msg.content
+        pure "Q: " }
 
 --
 -- Assistant
@@ -95,14 +98,14 @@ type AssistantStates = ChatWithMemory.States Message () () ()
 type AssistantQueries = ChatWithMemory.Queries Message ()
 
 assistant :: ChatOpenAI.Client -> Assistant
-assistant client = Agent.empty # 
-  ChatWithMemory.extend
-    { chat: Agent.empty # 
-        GPT.extend
-          { client
-          , chatOptions: ChatOpenAI.defaultChatOptions }
-    , memory: Agent.empty # 
-        Verbatim.extend }
+assistant client = Agent.empty
+  # ChatWithMemory.extend
+      { chat: Agent.empty
+        # GPT.extend
+            { client
+            , chatOptions: ChatOpenAI.defaultChatOptions }
+      , memory: Agent.empty
+        # Verbatim.extend }
 
 --
 -- main
