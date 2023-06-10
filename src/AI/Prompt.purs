@@ -2,8 +2,10 @@ module AI.Prompt where
 
 import Prelude
 
-import Control.Monad.Reader (ReaderT)
+import Data.Template (Template)
 
-newtype Prompt metas vars m = 
-  Prompt (ReaderT {metas :: Record metas, args :: Record vars} m String)
+type PromptTemplate prms args m = 
+  Template prms args m String
 
+type SystemAndPromptTemplate prms args m = 
+  Template prms args m {system :: String, user :: String}
