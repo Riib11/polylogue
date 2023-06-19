@@ -56,7 +56,7 @@ export type ChatCompletionUsage = {
 }
 
 // TODO: handle http errors
-export async function chatCompletion(openai_api_key: string, input: ChatCompletionInput): Promise<ChatCompletionOutput> {
+export async function chat(openai_api_key: string, input: ChatCompletionInput): Promise<ChatCompletionOutput> {
   const result = await axios.post('https://api.openai.com/v1/chat/completions',
     input,
     {
@@ -64,6 +64,7 @@ export async function chatCompletion(openai_api_key: string, input: ChatCompleti
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + openai_api_key
       }
-    })
+    }
+  )
   return result.data as ChatCompletionOutput
 }

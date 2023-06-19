@@ -1,10 +1,11 @@
-import { ChatCompletionInputOptional, ChatMessage, ChatModel, chatCompletion } from "../../api/openai";
+import { EmptyChoicesInResponse as EmptyResults } from "../../api/error";
+import { ChatCompletionInputOptional, ChatMessage, ChatModel, chat } from "../../api/openai";
 import Chat, { EmptyHistoryError } from "../Chat";
 
 export default class extends Chat<ChatMessage> {
   readonly openai_api_key: string
-  readonly model: ChatModel
-  readonly chatCompletionInputOptional: ChatCompletionInputOptional
+  model: ChatModel
+  chatCompletionInputOptional: ChatCompletionInputOptional
 
   constructor(
     openai_api_key: string,
@@ -19,20 +20,15 @@ export default class extends Chat<ChatMessage> {
 
   async chat(history: ChatMessage[]): Promise<ChatMessage> {
     if (history.length === 0) throw new EmptyHistoryError()
-    const result = await chatCompletion(this.openai_api_key,
+    const result = await chat(this.openai_api_key,
       {
         messages: history,
         model: this.model,
         ...this.chatCompletionInputOptional,
       }
     )
-    if (result.choices.length < 1) throw new EmptyChoicesInChatCompletionError()
+    if (result.choices.length < 1) throw new EmptyResults()
     return result.choices[0].message
   }
 }
 
-export class EmptyChoicesInChatCompletionError extends Error {
-  constructor() {
-    super("Expected at least one choice.")
-  }
-}

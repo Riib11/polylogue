@@ -4,10 +4,14 @@
     "module": "commonjs",
     "noImplicitAny": true,
     "sourceMap": true,
-    "outDir": "./dist/",
-    "declaration": true
+    "declaration": true,
+    "rootDir": "src",
+    "outDir": "build",
+    "moduleResolution": "node",
+    "pretty": true
   },
   "include": [
-    "src/**/*",
+    "src/**/*.ts",
   ],
+  "compileOnSave": true
 }
