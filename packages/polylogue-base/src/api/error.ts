@@ -1,5 +1,5 @@
-export class EmptyChoicesInResponse extends Error {
-  constructor() {
-    super("Expected at least one choice in response.")
+export class EmptyResultsError extends Error {
+  constructor(request: any) {
+    super("Expected at least one choice in response to request:\n\n" + JSON.stringify(request))
   }
 }

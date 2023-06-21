@@ -15,7 +15,7 @@ export default class extends Chat<string> {
       output: process.stdout
     })
 
-    const prompt = `${history.join('\n\n')}\n\n${this.prompt}`
+    const prompt = `${history.join('\n')}\n${this.prompt}`
     try {
       const result: string = await new Promise(resolve => cli.question(prompt, answer => resolve(answer)))
       return result

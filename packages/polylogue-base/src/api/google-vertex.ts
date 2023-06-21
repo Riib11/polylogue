@@ -8,22 +8,22 @@ export type ChatApiEndpoint = 'us-central1-aiplatform.googleapis.com'
 
 export type ChatModelId = 'chat-bison@001' | 'codechat-bison@001'
 
-export type ChatCompletionInput = ChatCompletionInputRequired & ChatCompletionInputOptional
+export type ChatInput = ChatInputRequired & ChatInputOptional
 
-export type ChatCompletionInputRequired = {
+export type ChatInputRequired = {
   api_endpoint: ChatApiEndpoint,
   project_id: string,
   model_id: ChatModelId
   messages: ChatMessage[],
-  parameters: ChatCompletionInputParameters
+  parameters: ChatInputParameters
 }
 
-export type ChatCompletionInputOptional = {
+export type ChatInputOptional = {
   context?: string,
   examples?: ChatExample[],
 }
 
-export type ChatCompletionInputParameters = {
+export type ChatInputParameters = {
   temperature?: number,
   maxOutputTokens?: number,
   topP?: number,
@@ -49,7 +49,7 @@ export type ChatCitationMetadata = {
 
 export type ChatCitation = string // TODO: what is this?
 
-export type ChatCompletionOutput = {
+export type ChatOutput = {
   predictions: ChatPrediction[]
 }
 
@@ -65,7 +65,7 @@ export type ChatSafetyAttributes = {
   blocked: false
 }
 
-export async function chat(client: OAuth2Client, input: ChatCompletionInput): Promise<ChatCompletionOutput> {
+export async function chat(client: OAuth2Client, input: ChatInput): Promise<ChatOutput> {
   const result = await client.request({
     method: 'POST',
     url: `https://${input.api_endpoint}/v1/projects/${input.project_id}/locations/us-central1/publishers/google/models/${input.model_id}:predict`,
@@ -80,5 +80,5 @@ export async function chat(client: OAuth2Client, input: ChatCompletionInput): Pr
       parameters: input.parameters
     }
   })
-  return result.data as ChatCompletionOutput
+  return result.data as ChatOutput
 }
