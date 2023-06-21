@@ -1,3 +1,4 @@
+/*
 import { config as loadDotenvConfig }  from 'dotenv'
 loadDotenvConfig()
 
@@ -16,3 +17,4 @@ export default async function main() {
   const reply = await oracle.predict('Hello, world!')
   console.log(reply)
 }
+*/

@@ -21,6 +21,10 @@ export type ChatMessage = { role: ChatRole, content: string }
 
 export type ChatRole = 'assistant' | 'user' | 'system'
 
+export const user = (content: string): ChatMessage => ({ role: 'user', content })
+export const assistant = (content: string): ChatMessage => ({ role: 'assistant', content })
+export const system = (content: string): ChatMessage => ({ role: 'system', content })
+
 export type ChatCallFunction
   = 'none' // won't call function
   | 'auto' // can call any function or not

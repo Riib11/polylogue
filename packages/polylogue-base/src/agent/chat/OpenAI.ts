@@ -1,34 +1,40 @@
 import { EmptyResultsError } from "../../api/error";
-import { ChatInputOptional, ChatMessage, ChatModel, chat } from "../../api/openai";
-import Chat, { EmptyHistoryError } from "../Chat";
+import { ChatMessage, openAiChatMessageTranslation as translation } from "../../api/universal";
+import * as OpenAi from '../../api/openai'
+import Chat, { EmptyNewMessagesError } from "../Chat";
 
 export type Config = {
-  model: ChatModel,
-  systemMessage?: ChatMessage,
-  chatCompletionInputOptional?: ChatInputOptional
+  model: OpenAi.ChatModel,
+  systemPrompt?: string,
+  chatCompletionInputOptional?: OpenAi.ChatInputOptional
   openai_api_key?: string,
 }
 
-export default class extends Chat<ChatMessage> {
+export default class extends Chat {
   readonly config: Config
   constructor(config: Config) {
     super()
     this.config = config
   }
 
-  async chat(messages: ChatMessage[]): Promise<ChatMessage> {
-    messages = (this.config.systemMessage ? [this.config.systemMessage] : []).concat(messages)
-    if (messages.length === 0) throw new EmptyHistoryError()
-    const result = await chat(
+  async chatArray(messages: ChatMessage[]): Promise<ChatMessage> {
+    const openaiMessages: OpenAi.ChatMessage[] =
+      (this.config.systemPrompt ?
+        [OpenAi.system(this.config.systemPrompt)] :
+        [])
+        .concat(messages.map(msg => translation.to(msg)))
+    if (messages.length === 0) throw new EmptyNewMessagesError()
+    const result = await OpenAi.chat(
       {
         model: this.config.model,
-        messages,
+        // messages: messages.map(msg => translation.to(msg)),
+        messages: openaiMessages,
         ...this.config.chatCompletionInputOptional,
       },
       this.config.openai_api_key,
     )
     if (result.choices.length < 1) throw new EmptyResultsError(messages)
-    return result.choices[0].message
+    return translation.from(result.choices[0].message)
   }
 }
 

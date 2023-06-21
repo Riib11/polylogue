@@ -1,8 +1,10 @@
+/*
 import * as openai from 'polylogue-base/build/api/openai'
 import * as vertex from 'polylogue-base/build/api/google-vertex'
 import { GoogleAuth, OAuth2Client } from 'google-auth-library'
 import { config } from 'dotenv'
 config()
+*/
 
 /*
 export default async function main() {

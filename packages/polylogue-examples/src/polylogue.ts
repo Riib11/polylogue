@@ -1,3 +1,4 @@
+/*
 import { Interlocutors } from 'polylogue-base/build/agent/Polylogue'
 import Echo from 'polylogue-base/build/agent/chat/Echo'
 import Polylogue from 'polylogue-base/build/agent/polylogue/Simple'
@@ -119,4 +120,4 @@ export default async function main() {
   polylogue.chatTo('chat1', history)
 }
 
-main()
+*/
