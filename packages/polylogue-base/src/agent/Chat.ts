@@ -1,7 +1,7 @@
 import Agent from "../Agent"
 
 export default abstract class <message> extends Agent {
-  abstract chat(history: message[]): Promise<message>
+  abstract chat(messages: message[]): Promise<message>
 }
 
 export class EmptyHistoryError extends Error {

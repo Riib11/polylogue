@@ -16,8 +16,8 @@ export default class extends Chat<ChatMessage> {
     this.config = config
   }
 
-  async chat(history: ChatMessage[]): Promise<ChatMessage> {
-    const messages = (this.config.systemMessage ? [this.config.systemMessage] : []).concat(history)
+  async chat(messages: ChatMessage[]): Promise<ChatMessage> {
+    messages = (this.config.systemMessage ? [this.config.systemMessage] : []).concat(messages)
     if (messages.length === 0) throw new EmptyHistoryError()
     const result = await chat(
       {

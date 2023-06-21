@@ -9,13 +9,13 @@ export default class extends Chat<string> {
     this.prompt = prompt
   }
 
-  async chat(history: string[]): Promise<string> {
+  async chat(messages: string[]): Promise<string> {
     const cli = readline.createInterface({
       input: process.stdin,
       output: process.stdout
     })
 
-    const prompt = `${history.join('\n')}\n${this.prompt}`
+    const prompt = `${messages.join('\n')}\n${this.prompt}`
     try {
       const result: string = await new Promise(resolve => cli.question(prompt, answer => resolve(answer)))
       return result

@@ -24,16 +24,16 @@ export default class extends Chat<ChatMessage> {
     this.model_id = model_id
   }
 
-  async chat(history: ChatMessage[]): Promise<ChatMessage> {
+  async chat(messages: ChatMessage[]): Promise<ChatMessage> {
     const result = await chat(this.client, {
       api_endpoint: this.api_endpoint,
       project_id: this.project_id,
       model_id: this.model_id,
-      messages: history,
+      messages,
       parameters: this.parameters
     })
-    if (result.predictions.length < 1) throw new EmptyResultsError(history)
-    if (result.predictions[0].candidates.length < 1) throw new EmptyResultsError(history)
+    if (result.predictions.length < 1) throw new EmptyResultsError(messages)
+    if (result.predictions[0].candidates.length < 1) throw new EmptyResultsError(messages)
     return result.predictions[0].candidates[0]
   }
 }
